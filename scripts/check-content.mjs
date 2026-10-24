@@ -3,7 +3,8 @@
  * 콘텐츠 게이트. 게시 전에 아래를 검사하고 하나라도 걸리면 실패시킵니다.
  *   1) 모든 문서에 공식 출처 링크(sources)가 1개 이상 있다 — 도메인은 공공 기관 영역으로 제한하되,
  *      카드사 자체 절차처럼 기관 사이트에 없는 정보는 사람이 원문을 확인해 등록한 회사 도메인만 예외로 봅니다
- *      (label 에 회사 이름이 반드시 들어 있어야 통과).
+ *      (label 에 회사 이름이 반드시 들어 있어야 통과). 같은 도메인 제한은 본문에 걸은 외부 링크에도 적용됩니다. 같은 도메인 제한은 본문에 걸은 외부 링크에도 적용됩니다 —
+ *      frontmatter 만 보면 글 속 블로그·기사 링크가 무방비로 통과합니다.
  *   2) verification: pending 인 문서에 검증 메모가 있다 — 기본값이 pending 이므로 verification 을
  *      아예 적지 않으면 pending 으로 취급되어 메모 요구·수치 금지가 함께 걸립니다
  *   3) pending 문서가 법적 수치·제재 표현(만원/억원/가산세/제N조/N년 보존/기한 수치)을 쓰지 않았다
@@ -105,7 +106,13 @@ const RECHECK_HOSTS = /(^|\.)(law\.go\.kr|nts\.go\.kr|hometax\.go\.kr)$/i;
  */
 const ISSUER_SOURCES = [{ host: 'shinhancard.com', name: '신한카드' }];
 
-const DRIFT = /[\u3040-\u30ff\u4e00-\u9fff]/g;
+/**
+ * 한국어가 아닌 동아시아 문자 섞임. 히라가나·가타카나·한자(주로 쓰이는 U+4E00~9FFF)뿐 아니라
+ * 확장 A(U+3400~4DBF)·호환 한자(U+F900~FAFF)·주음문자(U+3100~312F)·전각 문자(U+FF00~FFEF)도 막습니다
+ * — 글을 옮기던 중 섞여 들어오는 영역들이라 빌드에서 함께 막습니다.
+ * U+3000~303F(「」··등)는 한국어 본문에서 실제로 쓰이므로 일부러 넣지 않았습니다.
+ */
+const DRIFT = /[\u3040-\u30ff\u3100-\u312f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef]/g;
 
 /** @type {string[]} */
 const problems = [];
@@ -114,8 +121,18 @@ for (const f of files) {
   const hasSources = /sources:\s*\n(?:\s*-\s+label:.*\n\s*url:\s*'?\S+'?\n)/.test(f.fm) || /url:\s*['"]https?:\/\//.test(f.fm);
   if (!hasSources) problems.push(`${rel}: 공식 출처(sources)가 없습니다`);
   // 출처로 적을 수 있는 도메인은 공공 기관 영역 + 확인해 둔 카드사 안내 페이지로 제한합니다.
-  const sourceUrls = [...f.fm.matchAll(/url:\s*['"]?(https?:\/\/[^\s'"]+)/g)].map((m) => m[1]);
-  const labeled = [...f.fm.matchAll(/-\s+label:\s*'([^']*)'\s*\n\s*url:\s*'([^']+)'/g)].map((m) => ({ label: m[1], url: m[2] }));
+  // 라벨·url 짝은 따옴표 종류와 적는 순서( 라벨 먼저 / url 먼저 )와 무관하게 찾아냅니다.
+  // 예전에는 한쪽 따옴표·특정 순서를 강요해서 표기 차이만으로 선의의 문서가 막혔습니다.
+  // 짝을 못 찾으면 label 은 빈 문자열이 되어 아래 검사에서 실패합니다(안전측으로 막음).
+  const labelHits = [...f.fm.matchAll(/label:\s*['"]?([^'"\n]+?)['"]?\s*$/gm)].map((m) => ({ at: m.index, value: m[1].trim() }));
+  const urlHits = [...f.fm.matchAll(/url:\s*['"]?(https?:\/\/[^\s'"]+)/g)].map((m) => ({ at: m.index, url: m[1] }));
+  const sourceUrls = urlHits.map((h) => h.url);
+  const labeled = urlHits.map((u) => {
+    const before = labelHits.filter((l) => l.at < u.at).pop();
+    const after = labelHits.find((l) => l.at > u.at);
+    const near = before && (!after || u.at - before.at <= after.at - u.at) ? before : after;
+    return { label: near ? near.value : '', url: u.url };
+  });
   for (const u of sourceUrls) {
     let host = '';
     try {
@@ -132,9 +149,27 @@ for (const f of files) {
     }
     if (issuer) {
       const hit = labeled.find((s) => s.url === u);
-      if (!hit) problems.push(`${rel}: '${host}' 출처는 label·url 을 따옴표로 함께 적어야 합니다(회사 이름 확인용)`);
+      if (!hit || !hit.label)
+        problems.push(
+          `${rel}: '${host}' 출처에 딸린 label 을 읽을 수 없습니다 — 회사 이름 확인용이므로 label 과 url 을 같은 항목에 적으세요`
+        );
       else if (!hit.label.includes(issuer.name))
         problems.push(`${rel}: '${host}' 출처의 label 에 '${issuer.name}' 이름이 없습니다 → '${hit.label}'`);
+    }
+  }
+
+  // 본문 링크도 같은 도메인 제한을 적용합니다. frontmatter 만 검사하면 글 안에 걸은 블로그·기사 링크가
+  // 무방비로 통과해서, '사도메인 차단' 이 실제로는 껍데기만 남습니다.
+  for (const m of f.body.matchAll(/\((https?:\/\/[^)\s]+)/g)) {
+    let host = '';
+    try {
+      host = new URL(m[1]).hostname;
+    } catch {
+      problems.push(`${rel}: 본문 링크 형식이 올바르지 않습니다 → ${m[1]}`);
+      continue;
+    }
+    if (!/(^|\.)(go\.kr|or\.kr|gov\.kr)$/i.test(host) && !ISSUER_SOURCES.some((s) => host === s.host || host.endsWith(`.${s.host}`))) {
+      problems.push(`${rel}: 본문 링크 도메인이 공공 기관 영역·확인해 둔 회사 도메인이 아닙니다 → ${host}`);
     }
   }
 
