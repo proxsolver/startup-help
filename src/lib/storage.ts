@@ -8,6 +8,7 @@
  * - 삭제 기록이 상한을 넘어 잘려나간 경우에는 그 개수를 화면에 돌려줍니다 → 조용히 되살아나는 행 없음.
  * - 백업 복원(전체 대체)은 restoreAt 시각을 찍습니다 → 복원 전에 태어난 삭제 기록이 복원된 행을 지우지 못합니다.
  * - 저장된 데이터가 이 코드보다 새로운 스키마면 쓰기를 거부하고 화면에 알립니다 → 되돌릴 수 없는 강등 방지.
+ * - 백업 복원은 크기·건수 상한을 두고 넘으면 아예 읽지 않습니다 → 복원 시도 한 번으로 탭을 죽일 수 없습니다.
  * - 지울 수 없는 행이 있으면 개수를 그대로 드러냅니다 → 조용히 사라지는 데이터 없음.
  */
 import { SCHEMA_VERSION, sanitizeEntries, type ReceiptEntry } from './receipts';
@@ -16,6 +17,68 @@ export const STORAGE_KEY = 'startup-help/state/v1';
 
 /** 삭제 기록 상한. 오래된 id 부터 버립니다(지운 개수만큼 자라 파일이 무거워지지 않도록). */
 export const MAX_TOMBSTONES = 2000;
+
+/**
+ * 백업 복원 상한(파일 크기, 바이트). 화면 컴포넌트가 FileReader 로 읽기 **전에** 봅니다 —
+ * 복원은 서버가 없어 이 브라우저 안에서만 일어나므로 '저장소에 안 들어간다' 가 방어가 아닙니다.
+ */
+export const MAX_BACKUP_BYTES = 20 * 1024 * 1024;
+
+/** 같은 수치의 문자 상한(UTF-16 길이). 파일 크기를 볼 수 없는 호출자(parseBackup 을 직접 호출하는 쪽)를 위한 후단입니다. */
+export const MAX_BACKUP_CHARS = 20 * 1024 * 1024;
+
+/**
+ * 백업 복원 상한(지출 항목 건수).
+ * 같은 코드로 재본 값: 행 하나당 저장 키 275~384 B(백업 파일은 줄바꿈·들이쓰기 때문에 약 35% 더 큼).
+ * 5,000건은 저장 키 1.3~1.9MB 로 무리 없지만, 50,000건은 13~19MB 가 되어 저장이 용량 초과로 실패하는
+ * 경로로 들어가고(실패는 배너로 알립니다) 그보다 먼저 표 렌더링에서 화면이 멈춥니다.
+ * 즉 이 선은 '복원은 됐는데 쓸 수 없는 상태' 를 막는 선입니다.
+ */
+export const MAX_BACKUP_ENTRIES = 5000;
+
+/**
+ * 백업 복원 상한(삭제 기록 id + 체크리스트 키).
+ * 지출 행만 막으면 같은 구멍이 따로 남습니다: 행이 0개인 파일로도 삭제 기록·체크리스트를
+ * 수십만 개 채워 넣을 수 있고, 그 값은 복원 때 어차피 버려지는 것들입니다(복원은 목록 대체·체크리스트 보존).
+ */
+export const MAX_BACKUP_RECORDS = 100_000;
+
+/** 복원이 거부된 사유. 정상이면 null 입니다. */
+export type RestoreRejection = 'too-large' | 'too-many' | 'too-many-records' | null;
+
+/** 복원 성공 결과 — `state` 가 항상 들어 있습니다. */
+export interface RestoredState {
+  rejected: null;
+  rejectedAt: 0;
+  state: AppState;
+  dropped: number;
+  future: boolean;
+}
+
+/** 거부된 결과 — `state` 를 아예 담지 않습니다. */
+export interface RestoreRejected {
+  rejected: Exclude<RestoreRejection, null>;
+  rejectedAt: number;
+  state: null;
+  dropped: 0;
+  future: false;
+}
+
+/**
+ * `rejected` 를 보고받지 않고 넘기는 호출이 실수로 목록을 통째로 바꾸지 못하게,
+ * 거부 결과에는 `state` 를 넣지 않는 판별 연합(discriminated union)으로 두었습니다.
+ */
+export type RestoreResult = RestoredState | RestoreRejected;
+
+function rejectRestore(reason: Exclude<RestoreRejection, null>, at: number): RestoreRejected {
+  return { rejected: reason, rejectedAt: at, state: null, dropped: 0, future: false };
+}
+
+/** 파일을 읽기 전 단계(화면)용. 바이트 크기가 복원 상한을 넘는지만 봅니다. */
+export function isBackupFileTooLarge(bytes: number): boolean {
+  // 크기를 잴 수 없는 파일은 넘는 것으로 처리합니다 — 뒤에서 문자 수 상한이 같은 판단을 다시 합니다.
+  return !Number.isFinite(bytes) || bytes > MAX_BACKUP_BYTES;
+}
 
 export interface ChecklistState {
   [itemId: string]: boolean;
@@ -264,8 +327,23 @@ export function serializeState(state: AppState): string {
   return JSON.stringify({ ...state, schemaVersion: SCHEMA_VERSION }, null, 2);
 }
 
-export function parseBackup(text: string): { state: AppState; dropped: number; future: boolean } {
-  return normalizeState(safeParse(text));
+export function parseBackup(text: string): RestoreResult {
+  // 1차 — 해석하기 전에 길이로 막습니다. 수십 MB 를 파싱한 뒤 버리는 것은 방어가 아니고,
+  // 화면에 닿기 전에 이 브라우저 탭부터 무너집니다.
+  if (text.length > MAX_BACKUP_CHARS) return rejectRestore('too-large', text.length);
+  const parsed = safeParse(text);
+  const raw = parsed !== null && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
+  // 2차 — 지출 행 건수. normalizeState 가 행을 골라내기 전에 원시 배열 길이로 봅니다.
+  const entryCount = Array.isArray(raw.entries) ? raw.entries.length : 0;
+  if (entryCount > MAX_BACKUP_ENTRIES) return rejectRestore('too-many', entryCount);
+  // 3차 — 삭제 기록·체크리스트 개수. 행이 한 줄도 없는 파일로도 이 부분만 채워 같은 사고를 낼 수 있고,
+  // 복원 때 삭제 기록은 비워지고 체크리스트는 파일 값이 쓰이지 않습니다(대체 대상이 아님).
+  const recordCount =
+    (Array.isArray(raw.removed) ? raw.removed.length : 0) +
+    (raw.checklist !== null && typeof raw.checklist === 'object' ? Object.keys(raw.checklist as object).length : 0);
+  if (recordCount > MAX_BACKUP_RECORDS) return rejectRestore('too-many-records', recordCount);
+  // 거부된 경로에서는 future 판정을 다시 묻지 않습니다 — 화면에는 거부 사유가 먼저입니다.
+  return { ...normalizeState(parsed), rejected: null, rejectedAt: 0 };
 }
 
 /**

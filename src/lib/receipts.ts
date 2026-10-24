@@ -299,11 +299,25 @@ export const CSV_HEADER = [
 
 export const CSV_COLUMN_COUNT = CSV_HEADER.length;
 
+/** 앞의 공백(탭·개행·붙여쓰기 공백)을 건너뛴 첫 글자가 `= + - @` 면 수식으로 계산될 여지가 있습니다. */
+const FORMULA_LIKE = /^\s*[=+\-@]/;
+
+/**
+ * CSV 셀 하나를 만들어 붙입니다. 두 가지를 따로 막습니다.
+ *
+ * 1) 쉼표·따옴표·개행·앞뒤 공백 → 인용 부호로 감싸서 열이 어긋나는 것을 막습니다.
+ * 2) 수식으로 시작할 여지(`= + - @`) → 셀 앞에 작은따옴표를 붙여 **텍스트로 고정**합니다.
+ *    인용 부호만으로는 엑셀·구글시트가 `"=WEBSERVICE(...)"` 를 계산하는 것을 막지 못합니다.
+ *    이 파일을 정산 담당자·검증자 컴퓨터에서 여는 순간 자기 PC에서만 끝나지 않기 때문에,
+ *    값을 지우거나 바꿔치기하지 않고 눈에 보이는 접두 하나만 남기는 방식을 택했습니다.
+ *    (CSV 를 다시 읽어들이는 길은 이 사이트에 없습니다 — 복원은 JSON 백업만 받습니다.)
+ */
 function csvCell(value: string | number): string {
   const s = String(value ?? '');
-  // 따옴표·쉼표·개행·앞뒤 공백, 그리고 수식으로 해석될 여지는 인용 부호로 무력화합니다.
-  if (/^[=+\-@\t\r]/.test(s) || /[",\n\r]/.test(s) || s !== s.trim()) return `"${s.replace(/"/g, '""')}"`;
-  return s;
+  const out = FORMULA_LIKE.test(s) ? `'${s}` : s;
+  // 따옴표·쉼표·개행·앞뒤 공백, 그리고 수식 접두를 붙인 셀은 인용 부호로 감쌉니다.
+  if (/^[=+\-@\t\r]/.test(s) || /[",\n\r]/.test(s) || s !== s.trim()) return `"${out.replace(/"/g, '""')}"`;
+  return out;
 }
 
 export function toCsvRows(entries: ReceiptEntry[]): string[][] {

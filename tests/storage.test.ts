@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  MAX_BACKUP_BYTES,
+  MAX_BACKUP_CHARS,
+  MAX_BACKUP_ENTRIES,
+  MAX_BACKUP_RECORDS,
   MAX_TOMBSTONES,
   STORAGE_KEY,
   backupFileName,
@@ -7,6 +11,7 @@ import {
   clearState,
   emptyState,
   getStorage,
+  isBackupFileTooLarge,
   isFutureSchema,
   loadState,
   loadStateDetailed,
@@ -194,7 +199,10 @@ describe('백업 파일 형식', () => {
       submitState: '초안 포함',
       memo: '샘플'
     });
-    const { state: restored, dropped } = parseBackup(serializeState(state));
+    const round = parseBackup(serializeState(state));
+    expect(round.rejected).toBeNull();
+    const restored = round.state!;
+    const dropped = round.dropped;
     expect(dropped).toBe(0);
     expect(restored.entries[0].memo).toBe('샘플');
     expect(restored.entries[0].budgetItem).toBe('출장·교통');
@@ -203,11 +211,90 @@ describe('백업 파일 형식', () => {
   });
 
   it('형식이 다른 파일은 빈 상태로', () => {
-    expect(parseBackup('not json').state.entries).toEqual([]);
+    const bad = parseBackup('not json');
+    expect(bad.rejected).toBeNull();
+    expect(bad.state!.entries).toEqual([]);
   });
 
   it('백업 파일명에 날짜가 들어간다', () => {
     expect(backupFileName(new Date('2026-03-31T12:00:00Z'))).toBe('startup-help-backup_20260331.json');
+  });
+});
+
+describe('백업 복원 상한 (복원 시도 하나가 탭을 죽이지 못하게)', () => {
+  const many = (n: number) =>
+    serializeState({ ...emptyState(), entries: Array.from({ length: n }, (_, i) => entry(`m${i}`, '2026-03-01')) });
+
+  it('읽기 전 단계: 파일 크기가 상한을 넘는지만 본다', () => {
+    expect(isBackupFileTooLarge(MAX_BACKUP_BYTES)).toBe(false);
+    expect(isBackupFileTooLarge(MAX_BACKUP_BYTES + 1)).toBe(true);
+    expect(isBackupFileTooLarge(0)).toBe(false);
+    // 크기를 잴 수 없으면 넘는 것으로 봅니다(뒤의 문자 수 상한이 같은 판단을 다시 합니다).
+    expect(isBackupFileTooLarge(Number.NaN)).toBe(true);
+  });
+
+  it('항목 건수 상한을 넘으면 복원하지 않고 사유와 실제 건수를 돌려준다', () => {
+    const r = parseBackup(many(MAX_BACKUP_ENTRIES + 1));
+    expect(r.rejected).toBe('too-many');
+    expect(r.rejectedAt).toBe(MAX_BACKUP_ENTRIES + 1);
+    // 거부된 결과에는 state 가 아예 없다 — 호출이 rejected 를 잊어도 목록을 바꿀 수 없습니다.
+    expect(r.state).toBeNull();
+  });
+
+  it('상한과 같은 건수는 그대로 복원된다', () => {
+    const r = parseBackup(many(MAX_BACKUP_ENTRIES));
+    expect(r.rejected).toBeNull();
+    expect(r.state?.entries).toHaveLength(MAX_BACKUP_ENTRIES);
+    expect(r.dropped).toBe(0);
+  });
+
+  it('행은 없어도 삭제 기록·체크리스트만 가득 채운 파일도 같은 이유로 막는다', () => {
+    const junk = JSON.stringify({
+      schemaVersion: SCHEMA_VERSION,
+      entries: [],
+      checklist: Object.fromEntries(Array.from({ length: MAX_BACKUP_RECORDS - 1 }, (_, i) => [`k${i}`, true])),
+      removed: ['r0'],
+      restoreAt: null,
+      lastExportAt: null
+    });
+    expect(parseBackup(junk).rejected).toBeNull();
+    const over = parseBackup(junk.replace('"removed":["r0"]', '"removed":["r0","r1"]'));
+    expect(over.rejected).toBe('too-many-records');
+    expect(over.rejectedAt).toBe(MAX_BACKUP_RECORDS + 1);
+    expect(over.state).toBeNull();
+    const manyRemoved = parseBackup(
+      JSON.stringify({
+        schemaVersion: SCHEMA_VERSION,
+        entries: [],
+        checklist: {},
+        removed: Array.from({ length: MAX_BACKUP_RECORDS + 1 }, (_, i) => `r${i}`),
+        restoreAt: null,
+        lastExportAt: null
+      })
+    );
+    expect(manyRemoved.rejected).toBe('too-many-records');
+    expect(manyRemoved.state).toBeNull();
+  });
+
+  it('문자 수 상한을 넘으면 JSON 해석조차 하지 않는다', () => {
+    // 뒷쪽에 의미 없는 공백을 이어 붙여 '읽을 수 있으나 너무 큰' 상태를 만듭니다.
+    // JSON 으로써는 정상이므로, 이것이 거부되는 이유는 크기 상한이어야 합니다.
+    const huge =
+      serializeState({ ...emptyState(), entries: [entry('h1', '2026-03-01')] }) + ' '.repeat(MAX_BACKUP_CHARS + 1);
+    expect(JSON.parse(huge).entries).toHaveLength(1);
+    const r = parseBackup(huge);
+    expect(r.rejected).toBe('too-large');
+    expect(r.rejectedAt).toBeGreaterThan(MAX_BACKUP_CHARS);
+    expect(r.state).toBeNull();
+  });
+
+  it('상한을 넘긴 파일은 더 새로운 형식 여부와 무관하게 크기·건수 사유가 먼저다', () => {
+    const hugeFuture =
+      JSON.stringify({ ...emptyState(), schemaVersion: SCHEMA_VERSION + 1, entries: [] }) +
+      ' '.repeat(MAX_BACKUP_CHARS + 1);
+    expect(parseBackup(hugeFuture).rejected).toBe('too-large');
+    // 범위 안에 들어오는 future 파일은 여전히 future 로 잡힙니다.
+    expect(parseBackup(JSON.stringify({ ...emptyState(), schemaVersion: SCHEMA_VERSION + 1 })).future).toBe(true);
   });
 });
 
@@ -425,7 +512,7 @@ describe('삭제 기록 일관성 (백업·복원·상한)', () => {
     expect(replace.ok).toBe(true);
     state = { ...state, entries: loadState(storage).entries, removed: loadState(storage).removed };
     const backup = parseBackup(serializeState(state));
-    expect(backup.state.entries.map((e) => e.id).sort()).toEqual(['a', 'b']);
+    expect(backup.state!.entries.map((e) => e.id).sort()).toEqual(['a', 'b']);
     expect(backup.dropped).toBe(0);
   });
 

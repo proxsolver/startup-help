@@ -7,8 +7,15 @@ import {
   PERIOD_STATES,
   SUBMIT_STATES
 } from '../lib/receipts';
+import { MAX_BACKUP_BYTES, MAX_BACKUP_ENTRIES, MAX_BACKUP_RECORDS } from '../lib/storage';
 
 const today = new Date().toISOString().slice(0, 10);
+/** 화면 안내가 코드 상한과 다른 숫자를 보여주지 않도록, 이 문장은 상수에서 만들어 씁니다. */
+const backupLimit = [
+  `${Math.round(MAX_BACKUP_BYTES / 1024 / 1024)}MB`,
+  `지출 ${MAX_BACKUP_ENTRIES.toLocaleString('ko-KR')}건`,
+  `기록 ${MAX_BACKUP_RECORDS.toLocaleString('ko-KR')}개`
+].join(' · ');
 ---
 
 <div id="receipt-tool" data-tool>
@@ -218,6 +225,9 @@ const today = new Date().toISOString().slice(0, 10);
   <p class="small muted no-print" style="margin-top:.4rem">
     <strong>지출 목록 비우기</strong>는 이 브라우저에 저장된 지출 항목만 삭제합니다. 체크리스트 확인 결과는 그대로 남습니다.
   </p>
+  <p class="small muted no-print" style="margin-top:.4rem">
+    <strong>JSON 복원</strong>은 이 도구가 내보낸 백업 파일만 읽습니다. 한 번에 받는 범위는 {backupLimit} 까지이고, 넘으면 복원하지 않고 사유를 알려줍니다 — 복원 시도 하나가 이 탭을 죽이지 못하게 하기 때문입니다.
+  </p>
 
   <p class="notice" data-storage-warning hidden>
     <strong>브라우저 저장에 실패했습니다</strong>
@@ -243,14 +253,18 @@ const today = new Date().toISOString().slice(0, 10);
   import {
     backupFileName,
     clearEntries,
+    isBackupFileTooLarge,
     loadStateDetailed,
+    MAX_BACKUP_BYTES,
+    MAX_BACKUP_ENTRIES,
     MAX_TOMBSTONES,
     parseBackup,
     replaceEntries,
     saveEntries,
     saveMeta,
     serializeState,
-    STORAGE_KEY
+    STORAGE_KEY,
+    type RestoreRejection
   } from '../lib/storage';
 
   const root = document.querySelector<HTMLElement>('[data-tool]');
@@ -618,15 +632,42 @@ const today = new Date().toISOString().slice(0, 10);
       filters = {};
     }
 
+    /** 거부 사유를 사용자 문장으로 바꿉니다. 상한 숫자는 상수에서 만들어 표시가 어긋나지 않습니다. */
+    function rejectMessage(rejected: Exclude<RestoreRejection, null>, at: number): string {
+      const n = at.toLocaleString('ko-KR');
+      if (rejected === 'too-large') return '파일이 읽을 수 있는 범위를 넘었습니다. 복원하지 않았습니다.';
+      if (rejected === 'too-many')
+        return `항목이 너무 많습니다(${n}건). 한 번에 복원하는 최대 건수는 ${MAX_BACKUP_ENTRIES.toLocaleString('ko-KR')}건입니다. 복원하지 않았습니다.`;
+      return `담긴 기록이 너무 많습니다(${n}개). 이 도구가 만든 백업 파일인지 확인해 주세요. 복원하지 않았습니다.`;
+    }
+
     const fileInput = input<HTMLInputElement>('import-file');
     fileInput?.addEventListener('change', () => {
       const file = fileInput.files?.[0];
       if (!file) return;
+      // 파일을 메모리에 올리기 전에 크기부터 봅니다. 이 도구엔 서버가 없어 복원 전 과정이
+      // 이 탭 안에서 일어나고, 저장을 거부하는 것만으로는 화면이 버팁니다.
+      if (isBackupFileTooLarge(file.size)) {
+        if (status)
+          status.textContent = `파일이 너무 큽니다(${(file.size / 1024 / 1024).toFixed(1)}MB). 복원은 ${Math.round(
+            MAX_BACKUP_BYTES / 1024 / 1024
+          )}MB 까지만 받습니다. 읽지 않았습니다.`;
+        fileInput.value = '';
+        return;
+      }
       const reader = new FileReader();
       reader.onload = () => {
         const text = String(reader.result ?? '');
-        const { state: restored, dropped, future } = parseBackup(text);
-        if (future) {
+        const result = parseBackup(text);
+        // 거부된 결과에는 state 가 들어 있지 않습니다(아래 흐름은 성공 경우만 지나갑니다).
+        if (result.rejected) {
+          if (status) status.textContent = rejectMessage(result.rejected, result.rejectedAt);
+          fileInput.value = '';
+          return;
+        }
+        const restored = result.state;
+        const dropped = result.dropped;
+        if (result.future) {
           if (status) status.textContent = '이 파일은 이 사이트의 더 새로운 형식 데이터입니다. 복원하지 않았습니다.';
           fileInput.value = '';
           return;

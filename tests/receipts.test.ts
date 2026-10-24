@@ -288,12 +288,27 @@ describe('CSV 내보내기', () => {
     expect(wrapped).toContain('"줄바꿈\n포함"');
   });
 
-  it('수식으로 해석될 수 있는 값은 인용부호로 감싼다', () => {
-    const csv = toCsv([entry({ vendor: ' =SUM(A1)' })]);
-    expect(csv).toContain('" =SUM(A1)"');
-    expect(toCsv([entry({ memo: '+1' })])).toContain('"+1"');
-    expect(toCsv([entry({ memo: '-1' })])).toContain('"-1"');
-    expect(toCsv([entry({ memo: '@cmd' })])).toContain('"@cmd"');
+  it('수식으로 해석될 수 있는 값은 셀 앞에 작은따옴표를 붙여 텍스트로 고정한다', () => {
+    // 인용 부호만으로는 엑셀·구글시트가 "=..." 를 계산하는 것을 막지 못합니다.
+    expect(toCsv([entry({ vendor: '=SUM(A1)' })])).toContain('"\'=SUM(A1)"');
+    expect(toCsv([entry({ memo: '+1' })])).toContain('"\'+1"');
+    expect(toCsv([entry({ memo: '-1' })])).toContain('"\'-1"');
+    expect(toCsv([entry({ memo: '@cmd' })])).toContain('"\'@cmd"');
+    // 값 자체를 지우거나 바꾸지 않습니다 — 접두만 붙습니다.
+    expect(toCsv([entry({ vendor: '=SUM(A1)' })])).toContain('SUM(A1)');
+  });
+
+  it('앞에 공백·탭이 있어 숨겨진 수식도 같은 방식으로 고정한다', () => {
+    // 첫 글자가 공백이어도 시트를 옮겨 붙이는 동안 수식으로 살아날 수 있어 같이 처리합니다.
+    expect(toCsv([entry({ vendor: ' =SUM(A1)' })])).toContain('"\' =SUM(A1)"');
+    expect(toCsv([entry({ memo: '\t=1+1' })])).toContain('"\'\t=1+1"');
+  });
+
+  it('일반 값에는 따옴표를 붙이지 않는다', () => {
+    const csv = toCsv([entry({ vendor: '원단상사', memo: '2차 분할' })]);
+    expect(csv).toContain('원단상사');
+    expect(csv).toContain('2차 분할');
+    expect(csv).not.toContain("'");
   });
 
   it('마이그레이션된 v1 항목도 새 헤더 순서로 나온다', () => {
