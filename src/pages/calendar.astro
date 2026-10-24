@@ -20,11 +20,14 @@ const pending = pendingCount();
 
   <aside class="notice">
     <strong>현재 {pending}개 항목의 시점이 비어 있습니다</strong>
-    사업비 제출 기한, 전용 카드 사용 요구, 인정·불인정 범위, 서류 보존 기간은 사업 공고·협약서·담당 주관기관 지침(및 세법) 기준입니다.
-    1차 출처 검증이 끝나는 대로 채우고, 검증 전에는 추정치를 올리지 않습니다.
-    <strong>값이 확정되는 자리</strong> 열이 그 항목을 어디서 확인해야 하는지(협약서·공지·원문)를 먼저 알려주고,
+    표는 두 축을 함께 싣습니다. <strong>세법이 정한 시점</strong>(부가가치세·종합소득세·원천세 신고, 증빙·장부 보관)은
+    법제처 원문을 직접 열어 확인한 값으로 채웠고, 근거 조문과 확인 날짜를 <strong>값이 확정되는 자리</strong> 열에 적었습니다.
+    <strong>지원사업이 정하는 시점</strong>(사업비 제출 기한, 전용 카드 사용 요구, 인정·불인정 범위, 지원사업 서류 보존 기간)은
+    사업 공고·협약서·담당 주관기관 지침마다 달라 자동화로 원문을 확인할 수 없으므로 빈칸으로 둡니다.
     <strong>확인</strong> 열의 링크가 그 원문으로 갑니다. 급한 마감은 담당 기관 공지와
     <a href="https://modoo.or.kr" rel="noopener noreferrer external" target="_blank">모두의 창업</a> 안내에서 확인하세요.
+    세무 축의 세부 값과 단서(주말·공휴일 이연, 직권 연장)는
+    <a href={p('/guide/settlement/tax-obligations/')}>세법이 정한 신고 기한과 증빙 보관 기간</a>에 적었습니다.
   </aside>
 
   <div class="table-scroll">

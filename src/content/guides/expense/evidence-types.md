@@ -53,3 +53,4 @@ sources:
 - [서류를 못 받은 거래 되돌리기](/guide/expense/missing-voucher/)
 - [결제 경로별로 남는 기록](/guide/expense/payment-channels/)
 - [정산 제출 꾸러미 흐름](/guide/settlement/settlement-package/)
+- [세법이 정한 신고 기한과 증빙 보관 기간](/guide/settlement/tax-obligations/) — 받아 둔 서류를 얼마나 두고 있어야 하는지의 세법 기준

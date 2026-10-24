@@ -1,8 +1,13 @@
 /**
  * 정산·제출 준비 항목.
  *
- * ⚠️ 제출 기한·시점·제재는 사업 공고·협약서·담당 주관기관 지침(및 세법) 기준이므로,
- *    1차 출처로 확인하기 전에는 dueText 를 null 로 두고 "시점 확인 필요" 만 표시합니다.
+ * ⚠️ 두 종류의 시점이 섞여 있습니다. 구분해서 채웁니다.
+ *  - 세법에서 정한 시점(부가세·종합소득세·원천세, 증빙 보관 기간):
+ *    법제처 원문과 국세청 안내를 직접 열어 확인한 것만 dueText 에 적고 verification: 'verified' 로 둡니다.
+ *    확인한 조문·시행일은 같은 항목의 decidedBy 와 출처 링크에 남깁니다.
+ *  - 지원사업(모두의 창업) 자체가 정하는 시점·요구:
+ *    사업 공고·협약서·사업별 세부관리기준·배정 주관기관 공지마다 다르고 자동화로는 원문을 열 수 없습니다.
+ *    따라서 dueText 는 null, detail/decidedBy 에 "어디서 확정되는가" 만 적습니다.
  *    (npm run check:content 가 pending 항목에 숫자 기한·금액이 들어가면 빌드를 실패시킵니다)
  *
  * decidedBy 는 "그 값을 어디서 확정할 수 있는가" 입니다. 값 자체보다 이 열이 사용자에게 먼저 쓰입니다.
@@ -35,7 +40,30 @@ const MSS_NOTICE: ScheduleSource = { label: '중소벤처기업부 통합 모집
 const OPS_RULE: ScheduleSource = { label: '중소기업창업 지원사업 운영요령 (국가법령정보센터)', url: 'https://www.law.go.kr/LSW/admRulLsInfoP.do?admRulSeq=2100000222594' };
 const MGMT_GUIDE: ScheduleSource = { label: '중소기업창업 지원사업 통합관리지침 개정 안내', url: 'https://www.k-startup.go.kr/user/board/webRFRR_view_reference.do?schM=view&id=172153' };
 const SUBSIDY_RULE: ScheduleSource = { label: '국고보조금 통합관리지침 (국가법령정보센터)', url: 'https://www.law.go.kr/LSW/admRulInfoP.do?admRulSeq=2100000275316&chrClsCd=010201' };
-const INCOME_ACT: ScheduleSource = { label: '소득세법 원문 (국가법령정보센터)', url: 'https://www.law.go.kr/LSW/lsLawLinkInfo.do?lsJoLnkSeq=1000819819&lsId=001565&chrClsCd=010202' };
+const INCOME_ACT: ScheduleSource = {
+  label: '소득세법 원문 (국가법령정보센터)',
+  url: 'https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq=280405&efYd=20260701'
+};
+const VAT_ACT: ScheduleSource = {
+  label: '부가가치세법 원문 (국가법령정보센터)',
+  url: 'https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq=276117&efYd=20260102'
+};
+const COMMERCIAL_CODE: ScheduleSource = {
+  label: '상법 원문 (국가법령정보센터)',
+  url: 'https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq=273629&efYd=20260910'
+};
+const NTS_VAT: ScheduleSource = {
+  label: '국세청 부가가치세 신고·납부 기한 안내',
+  url: 'https://www.nts.go.kr/nts/cm/cntnts/cntntsView.do?mi=2273&cntntsId=7694'
+};
+const NTS_INCOME: ScheduleSource = {
+  label: '국세청 종합소득세 신고·납부 기한 안내',
+  url: 'https://www.nts.go.kr/nts/cm/cntnts/cntntsView.do?mi=2225&cntntsId=7665'
+};
+const NTS_WITHHOLD: ScheduleSource = {
+  label: '국세청 원천세 신고·납부 기한 안내',
+  url: 'https://www.nts.go.kr/nts/cm/cntnts/cntntsView.do?mi=2414&cntntsId=7702'
+};
 const HTS: ScheduleSource = { label: '홈택스', url: 'https://www.hometax.go.kr' };
 const NTS: ScheduleSource = { label: '국세청', url: 'https://www.nts.go.kr' };
 const SELF: ScheduleSource = { label: '월 마감 루틴 안내 (이 사이트)', url: 'https://proxsolver.github.io/startup-help/guide/settlement/monthly-close/' };
@@ -123,15 +151,37 @@ export const SCHEDULE_ITEMS: ScheduleItem[] = [
     sources: [MODOO, KSTARTUP]
   },
   {
-    id: 'retention',
-    label: '서류 보존 기간 확인',
+    id: 'retention-tax',
+    label: '세무 증빙 보관 (사업자로서)',
     detail:
-      '제출 뒤에도 증빙을 보관해야 하는 기간이 정해져 있습니다. 지원사업 서류와 세무 증빙은 근거도, 기간을 세기 시작하는 시점도 다르므로 한 줄로 합쳐 적으면 안 됩니다. 지원사업 쪽은 운영요령·통합관리지침, 세무 쪽은 소득세법·부가가치세법을 각각 확인해 두 칸으로 나눠 적으세요.',
+      '사업소득·기타소득의 필요경비로 인정받으려는 지출은 그 증명서류를 받아 보관해야 합니다. 보관 기간과 기산점이 법에 적혀 있어 아래 칸은 채웠습니다. 다만 지원사업 정산에서 요구하는 보존 기간은 별개라 위의 "지원사업 서류 보존" 칸을 함께 봐야 합니다.',
+    dueText: '확정신고기간 종료일부터 5년간 (소득세법 제160조의2①)',
+    verification: 'verified',
+    appliesTo: ['execute', 'settle'],
+    decidedBy: '소득세법 제160조의2① 원문 확인 (확인 2026-10-24, 현행 시행 기준)',
+    sources: [INCOME_ACT]
+  },
+  {
+    id: 'retention-books',
+    label: '장부·중요서류 보존 (상법)',
+    detail:
+      '세법이 정한 증빙 보관과 별도로, 상인은 상업장부와 영업에 관한 중요서류를 더 오래 보존해야 합니다. 전표나 이와 비슷한 서류는 세법 기준과 같은 짧은 기간이 적용됩니다. 법인 사업자의 내부 장부 체계는 이 기준으로 점검하세요.',
+    dueText: '상업장부·중요서류 10년, 전표 또는 이와 유사한 서류 5년 (상법 제33조①)',
+    verification: 'verified',
+    appliesTo: ['execute', 'settle'],
+    decidedBy: '상법 제33조① 원문 확인 (확인 2026-10-24, 현행 시행 기준)',
+    sources: [COMMERCIAL_CODE]
+  },
+  {
+    id: 'retention-grant',
+    label: '지원사업 서류 보존 기간',
+    detail:
+      '정산 제출 뒤에도 지원사업 서류를 보관해야 하는 기간이 별도로 있습니다. 근거는 중소기업창업 지원사업 운영요령과 사업별 세부관리기준·협약서이고, 세법의 보관 기간과 기산점이 다릅니다. 한 줄로 합쳐 적지 말고 이 칸을 원문 확인으로 채우세요.',
     dueText: null,
     verification: 'pending',
     appliesTo: ['settle'],
-    decidedBy: '운영요령·지침(지원사업) + 세법(소득·부가)',
-    sources: [OPS_RULE, MGMT_GUIDE, INCOME_ACT]
+    decidedBy: '운영요령 · 사업별 세부관리기준 · 협약서',
+    sources: [OPS_RULE, MGMT_GUIDE, SUBSIDY_RULE]
   },
   {
     id: 'refund',
@@ -144,14 +194,58 @@ export const SCHEDULE_ITEMS: ScheduleItem[] = [
     sources: [SUBSIDY_RULE, MGMT_GUIDE]
   },
   {
-    id: 'tax-side',
-    label: '세무 처리 확인 (별도 영역)',
+    id: 'vat-return',
+    label: '부가가치세 확정신고·납부',
     detail:
-      '지원금의 부가세·소득세 취급, 사후 환급금(경정청구·영수증을 못 받은 건 등)의 귀속, 사업자로서의 신고 기한은 정산과 별개의 세무 사항입니다. 일부 사업은 부가세 미환급 서약을 요구합니다. 신고 기한·환급 취급은 국세청·홈택스 안내와 세무 대리인 확인으로 정하세요.',
+      '사업자로서 과세기간(1~6월, 7~12월)의 확정 신고를 하는 자리입니다. 법정 기한은 과세기간이 끝난 후 25일 이내이고, 국세청은 일반과세자 기준 1기는 7월 1일~25일, 2기는 다음 해 1월 1일~25일로 안내합니다. 기한 마지막 날이 주말·공휴일이면 넘어가고, 국세청이 소규모 사업자의 납부기한을 직권으로 미루는 일이 해마다 있어 해당 기간의 공지를 함께 확인해야 합니다.',
+    dueText: '과세기간 종료 후 25일 이내 (국세청 안내: 1기 7.1.~7.25., 2기 다음 해 1.1.~1.25.)',
+    verification: 'verified',
+    appliesTo: ['execute', 'settle'],
+    decidedBy: '부가가치세법 제49조① 원문 + 국세청 부가세 신고납부기한 안내 (확인 2026-10-24)',
+    sources: [VAT_ACT, NTS_VAT, HTS]
+  },
+  {
+    id: 'income-tax-return',
+    label: '종합소득세 확정신고',
+    detail:
+      '사업소득이 있는 개인사업자는 그 해 소득을 다음 해 5월에 신고합니다. 지원사업에서 받은 돈의 취급(보조금인지, 소득인지)과 필요경비 범위는 정산 결과와 세무 처리가 엇갈릴 수 있는 지점이라 신고 전에 집행 내역을 정리해 두는 편이 좋습니다.',
+    dueText: '다음 해 5월 1일 ~ 5월 31일 (소득세법 제70조①)',
+    verification: 'verified',
+    appliesTo: ['settle'],
+    decidedBy: '소득세법 제70조① 원문 + 국세청 종합소득세 안내 (확인 2026-10-24)',
+    sources: [INCOME_ACT, NTS_INCOME, HTS]
+  },
+  {
+    id: 'withholding-return',
+    label: '원천소득세 신고·납부 (직원·외주 대가)',
+    detail:
+      '근로·인건비나 원천징수 대상 대가를 지급했다면 지급일이 속하는 달의 다음 달에 신고·납부합니다. 반기 납부 대상자는 1~6월분이 7월 10일, 7~12월분이 1월 10일입니다. 인건비 집행이 있는 달에는 정산 서류와 별도 절차입니다.',
+    dueText: '지급일이 속하는 달의 다음 달 10일 (반기납부 특례: 1~6월분 7.10., 7~12월분 1.10.)',
+    verification: 'verified',
+    appliesTo: ['execute', 'settle'],
+    decidedBy: '소득세법(원천징수) + 국세청 원천세 신고납부기한 안내 (확인 2026-10-24)',
+    sources: [NTS_WITHHOLD, INCOME_ACT, HTS]
+  },
+  {
+    id: 'cash-receipt',
+    label: '현금영수증 의무발급',
+    detail:
+      '대상 업종 사업자(대통령령으로 정하는 업종)는 건당 거래금액이 이 선 이상이면 상대가 요구하지 않아도 현금영수증을 발급해야 합니다. 개인카드·현금 집행이 많은 경우 이 의무가 먼저인지라, 발급을 못 받은 건은 미수취로 두고 재요청 목록에 올려 두세요.',
+    dueText: '건당 거래금액(부가가치세액 포함) 10만원 이상 (소득세법 제162조의3④)',
+    verification: 'verified',
+    appliesTo: ['execute'],
+    decidedBy: '소득세법 제162조의3④ 원문 확인 (대상 업종은 대통령령, 확인 2026-10-24)',
+    sources: [INCOME_ACT, NTS, HTS]
+  },
+  {
+    id: 'tax-side',
+    label: '지원금의 세무 취급 (별도 확인)',
+    detail:
+      '지원금 자체의 부가세·소득세 취급, 집행한 부가세의 환급 가능 여부와 미환급 서약, 경정청구로 되받을 수 있는 범위는 위 신고 기한과 별개의 문제입니다. 사업별로 요구하는 확인서가 다르고 국세청 일반 안내로도 확정되지 않으므로 세무 대리인과 협약서 조건을 함께 봐야 합니다.',
     dueText: null,
     verification: 'pending',
     appliesTo: ['execute', 'settle'],
-    decidedBy: '국세청·홈택스 안내 / 세무 대리인',
+    decidedBy: '협약서·공고 조건 + 세무 대리인 확인',
     sources: [HTS, NTS, INCOME_ACT]
   }
 ];
