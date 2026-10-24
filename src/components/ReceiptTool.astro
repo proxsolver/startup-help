@@ -244,6 +244,7 @@ const today = new Date().toISOString().slice(0, 10);
     backupFileName,
     clearEntries,
     loadStateDetailed,
+    MAX_TOMBSTONES,
     parseBackup,
     replaceEntries,
     saveEntries,
@@ -276,9 +277,12 @@ const today = new Date().toISOString().slice(0, 10);
     const loaded = loadStateDetailed();
     let state = loaded.state;
     let filters: Filters = {};
-    /** 지운 id 기록(저장소에 함께 둔다). 오래된 화면을 든 다른 탭이 같은 id 를 보내도 되살아나지 않습니다. */
-    let removedIds: string[] = loaded.state.removed.slice();
+    /** 지운 id 기록은 state.removed 하나만 씁니다(저장소·백업·화면이 같은 목록을 공유해야 지운 행이 되살아나지 않습니다). */
     let droppedCount = loaded.dropped;
+    /** 삭제 기록이 상한에 밀려 몇 건 버려졌는지. 0 이 아니면 다른 탭이 그 행을 되살릴 수 있습니다. */
+    let trimmedCount = 0;
+    /** 다른 탭의 복원(전체 대체) 때문에 이 화면의 마지막 입력을 반영하지 못한 상태인지. */
+    let restoredByOtherTab = false;
     let writeBlocked = loaded.future;
 
     function showLoadNote() {
@@ -291,6 +295,14 @@ const today = new Date().toISOString().slice(0, 10);
       }
       if (droppedCount > 0) {
         notes.push(`저장된 항목 중 형식 때문에 읽지 못한 ${droppedCount}건이 있습니다. 그 행은 화면에 없는 것과 같고, 새로 저장하면 저장소에서 사라집니다.`);
+      }
+      if (trimmedCount > 0) {
+        notes.push(
+          `삭제 기록이 상한(${MAX_TOMBSTONES}건)을 넘어 최근 정리에서 ${trimmedCount}건을 더 기억하지 못했습니다. 이 화면을 오래 열어 둔 다른 탭이 그 행을 되살아나게 할 수 있으니, 다른 탭을 모두 닫고 새로 고침하세요.`
+        );
+      }
+      if (restoredByOtherTab) {
+        notes.push('다른 탭에서 지출 목록을 복원(전체 대체)해서, 이 화면이 방금 하려던 정리는 반영하지 않았습니다. 목록이 기대와 다르다면 이 탭에서 다시 정리해 주세요.');
       }
       loadNote.textContent = notes.join(' ');
       loadNote.hidden = notes.length === 0;
@@ -462,7 +474,18 @@ const today = new Date().toISOString().slice(0, 10);
         showLoadNote();
         return;
       }
-      const res = saveEntries(state.entries, removedIds);
+      const res = saveEntries(state.entries, state.removed, undefined, state.restoreAt);
+      if (res.superseded) {
+        // 다른 탭이 목록을 통째로 복원했습니다. 그쪽이 정답이므로 이 화면의 오래된 목록·삭제 기록을 섞지 않습니다.
+        state.entries = res.merged;
+        state.removed = res.removed;
+        state.restoreAt = res.restoreAt;
+        trimmedCount = 0;
+        restoredByOtherTab = true;
+        showLoadNote();
+        render();
+        return;
+      }
       if (res.future) {
         writeBlocked = true;
         showLoadNote();
@@ -472,7 +495,15 @@ const today = new Date().toISOString().slice(0, 10);
       }
       if (res.ok) {
         state.entries = res.merged;
-        removedIds = res.removed;
+        state.removed = res.removed;
+        if (res.trimmed > 0) {
+          trimmedCount = res.trimmed;
+          showLoadNote();
+        }
+        if (restoredByOtherTab) {
+          restoredByOtherTab = false;
+          showLoadNote();
+        }
       }
       if (warning) warning.hidden = res.ok;
     }
@@ -481,7 +512,7 @@ const today = new Date().toISOString().slice(0, 10);
       const before = state.entries.length;
       state.entries = state.entries.filter((e) => e.id !== id);
       if (state.entries.length !== before) {
-        removedIds.push(id);
+        state.removed.push(id);
         persist();
         render();
       }
@@ -609,17 +640,22 @@ const today = new Date().toISOString().slice(0, 10);
           return;
         }
         state.entries = restored.entries;
-        removedIds = [];
+        state.removed = [];
+        trimmedCount = 0;
         droppedCount = dropped;
         resetFilterControls();
         // 복원은 목록 전체를 대체합니다(다른 탭 행과 병합하지 않음). 체크리스트는 저장된 값 그대로 둡니다.
         const res = replaceEntries(state.entries);
         writeBlocked = res.future;
+        state.restoreAt = res.restoreAt;
         if (warning) warning.hidden = res.ok;
         showLoadNote();
         render();
         const skipped = dropped > 0 ? ` · 형식 오류 ${dropped}건은 건너뜀` : '';
-        if (status) status.textContent = `복원 완료 · ${state.entries.length}건${skipped}`;
+        if (status)
+          status.textContent = res.ok
+            ? `복원 완료 · ${state.entries.length}건${skipped}`
+            : `저장소에 쓰지 못했습니다 · 화면만 ${state.entries.length}건으로 바꿨습니다. 백업·다른 탭 저장 상태와 다를 수 있습니다.`;
         fileInput.value = '';
       };
       reader.onerror = () => {
@@ -639,14 +675,16 @@ const today = new Date().toISOString().slice(0, 10);
       const res = clearEntries();
       if (res.future || writeBlocked || !res.ok) {
         if (res.future) writeBlocked = true;
-        if (warning) warning.hidden = true;
+        // 쓰기에 실패했는데 경고 창을 숨기면 저장이 안 되는 상태를 모른 채 지나갑니다.
+        if (warning) warning.hidden = false;
         if (status) status.textContent = res.future ? '더 새로운 형식 데이터라 저장소를 비우지 않았습니다.' : '저장소에 쓰지 못했습니다.';
         render();
         showLoadNote();
         return;
       }
       state.entries = [];
-      removedIds = res.removed;
+      state.removed = res.removed;
+      if (res.trimmed > 0) trimmedCount = res.trimmed;
       droppedCount = 0;
       showLoadNote();
       render();
@@ -662,16 +700,39 @@ const today = new Date().toISOString().slice(0, 10);
         showLoadNote();
         return;
       }
-      const res = saveEntries(state.entries, removedIds);
+      // 다른 탭이 백업 복원으로 목록을 통째로 대체했다면 그쪽이 정답입니다.
+      // 이 화면이 복원 전에 열려 있었다면 들고 있던 삭제 기록이 방금 복원된 행을 지워버리므로 섞지 않습니다.
+      if ((fresh.state.restoreAt ?? 0) > (state.restoreAt ?? 0)) {
+        state = fresh.state;
+        trimmedCount = 0;
+        droppedCount = fresh.dropped;
+        showLoadNote();
+        render();
+        if (status) status.textContent = '다른 탭에서 목록을 복원했습니다. 이 화면도 그 내용으로 바꿨습니다.';
+        return;
+      }
+      const res = saveEntries(state.entries, state.removed, undefined, state.restoreAt);
       if (res.future) {
         writeBlocked = true;
         showLoadNote();
         render();
         return;
       }
+      if (res.superseded) {
+        state.entries = res.merged;
+        state.removed = res.removed;
+        state.restoreAt = res.restoreAt;
+        trimmedCount = 0;
+        droppedCount = fresh.dropped;
+        showLoadNote();
+        render();
+        return;
+      }
       if (res.ok) {
         state.entries = res.merged;
-        removedIds = res.removed;
+        state.removed = res.removed;
+        state.restoreAt = fresh.state.restoreAt;
+        if (res.trimmed > 0) trimmedCount = res.trimmed;
       }
       droppedCount = fresh.dropped;
       showLoadNote();

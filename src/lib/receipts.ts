@@ -7,7 +7,14 @@
  * 사이트에서 단정하지 않고, 사용자가 고른 분류를 집계만 합니다.
  */
 
-export const SCHEMA_VERSION = 2;
+/**
+ * 저장본(localStorage) 형식 표식. 올리는 이유는 강등 방지를 위해서입니다:
+ * 이 값보다 큰 저장본을 만난 코드는 쓰기를 거부합니다(storage.ts 의 isFutureSchema).
+ *   1 → 2 : 집행기간·수취상태·제출상태·비목 항목 체계 도입
+ *   2 → 3 : 삭제 기록(removed)과 복원 세대(restoreAt) 필드 도입 — 예전 번들이 그 두 칸을
+ *           조용히 지우면 지운 행이 되살아나고 남의 복원을 덮어씁니다. 그래서 아예 쓰기를 막습니다.
+ */
+export const SCHEMA_VERSION = 3;
 
 /** 결제(지출) 경로. v1 의 모호한 '카드' 값은 마이그레이션에서 '확인 필요' 로 보정됩니다. */
 export const PAY_METHODS = [

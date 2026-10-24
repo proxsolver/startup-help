@@ -380,4 +380,120 @@ describe('관심사별 저장 (두 탭이 서로를 덮어쓰지 않는다)', ()
     const stale = saveEntries([entry('a', '2026-03-01'), entry('b', '2026-03-02')], [], storage);
     expect(stale.merged).toEqual([]);
   });
+
+  it('비우기로 만든 삭제 기록도 상한을 넘지 않는다', () => {
+    const many = Array.from({ length: MAX_TOMBSTONES + 5 }, (_, i) => entry(`x${i}`, '2026-03-01'));
+    saveState({ ...emptyState(), entries: many, removed: ['old-1', 'old-2'] }, storage);
+    const cleared = clearEntries(storage);
+    expect(cleared.removed).toHaveLength(MAX_TOMBSTONES);
+    expect(cleared.trimmed).toBe(7);
+    expect(cleared.removed[0]).toBe('x5');
+    expect(cleared.removed).not.toContain('old-1');
+    expect(cleared.removed[cleared.removed.length - 1]).toBe(`x${MAX_TOMBSTONES + 4}`);
+    expect(loadState(storage).removed).toHaveLength(MAX_TOMBSTONES);
+  });
+});
+
+/**
+ * 화면(ReceiptTool)이 지켜야 있는 계약들 — 지운 행·백업·두 탭 복원이 서로를 망치지 않는지 확인합니다.
+ * 화면은 삭제 기록을 따로 두지 않고 state.removed 하나만 씁니다. 아래도 그 방식으로 검증합니다.
+ */
+describe('삭제 기록 일관성 (백업·복원·상한)', () => {
+  let storage: Storage;
+  beforeEach(() => {
+    storage = asStorage();
+  });
+
+  /** 화면처럼: 저장본을 읽고 → 바꾸고 → 저장하고 → 다시 읽는다. */
+  const liveIds = () => loadState(storage).entries.map((e) => e.id).sort();
+
+  it('화면 상태의 삭제 기록이 저장본과 어긋나지 않는다 (백업이 자기 행을 지우는 사고 방지)', () => {
+    saveState({ ...emptyState(), entries: [entry('a', '2026-03-01'), entry('b', '2026-03-02')] }, storage);
+    let state = loadState(storage);
+    // b 삭제
+    const del = saveEntries(
+      state.entries.filter((e) => e.id !== 'b'),
+      [...state.removed, 'b'],
+      storage,
+      state.restoreAt
+    );
+    state = { ...state, entries: del.merged, removed: del.removed };
+    expect(liveIds()).toEqual(['a']);
+
+    // 이 상태 그대로 복원했다가 다시 백업으로 받는 왕복
+    const replace = replaceEntries([entry('a', '2026-03-01'), entry('b', '2026-03-02')], storage, 1000);
+    expect(replace.ok).toBe(true);
+    state = { ...state, entries: loadState(storage).entries, removed: loadState(storage).removed };
+    const backup = parseBackup(serializeState(state));
+    expect(backup.state.entries.map((e) => e.id).sort()).toEqual(['a', 'b']);
+    expect(backup.dropped).toBe(0);
+  });
+
+  it('삭제 기록이 살아 있는 행과 겹치지 않는다 (지운 id 만 기록에 남는다)', () => {
+    saveState({ ...emptyState(), entries: [entry('a', '2026-03-01'), entry('b', '2026-03-02')] }, storage);
+    saveEntries([entry('a', '2026-03-01')], ['b'], storage);
+    const afterDelete = loadState(storage);
+    expect(afterDelete.removed).toEqual(['b']);
+    expect(afterDelete.entries.some((e) => afterDelete.removed.includes(e.id))).toBe(false);
+
+    // 복원은 삭제 기록을 비운다 — 그 뒤에도 겹침이 생기지 않아야 한다.
+    replaceEntries([entry('b', '2026-03-02'), entry('c', '2026-03-03')], storage, 2000);
+    const afterRestore = loadState(storage);
+    expect(afterRestore.removed).toEqual([]);
+    expect(afterRestore.entries.map((e) => e.id).sort()).toEqual(['b', 'c']);
+  });
+
+  it('다른 탭이 복원으로 목록을 대체하면 오래된 화면의 저장이 물러난다', () => {
+    saveState({ ...emptyState(), entries: [entry('old', '2026-03-01')] }, storage);
+    replaceEntries([entry('kept', '2026-03-05')], storage, 5000);
+    // 복원 전에 열린 탭: 자기 화면에는 'kept' 이 없고 'old' 를 지우려 했던 기억이 있다.
+    const stale = saveEntries([entry('old', '2026-03-01')], ['kept'], storage, 4000);
+    expect(stale.superseded).toBe(true);
+    expect(stale.ok).toBe(false);
+    expect(stale.merged.map((e) => e.id)).toEqual(['kept']);
+    expect(stale.removed).toEqual([]);
+    expect(stale.restoreAt).toBe(5000);
+    // 저장소는 복원된 그대로 — 되살아난 행도, 지워진 행도 없다.
+    expect(liveIds()).toEqual(['kept']);
+    // 같은 화면이 새 세대를 받아들인 뒤에는 저장이 다시 동작한다.
+    const next = saveEntries([entry('kept', '2026-03-05'), entry('fresh', '2026-03-06')], [], storage, stale.restoreAt);
+    expect(next.superseded).toBe(false);
+    expect(next.ok).toBe(true);
+    expect(liveIds()).toEqual(['fresh', 'kept']);
+  });
+
+  it('restoreAt 는 저장본에서 읽고, 형식이 이상하면 없는 것으로 다룬다', () => {
+    replaceEntries([entry('a', '2026-03-01')], storage, 12345);
+    expect(loadState(storage).restoreAt).toBe(12345);
+    storage.setItem(STORAGE_KEY, JSON.stringify({ schemaVersion: 3, entries: [], restoreAt: 'x' }));
+    expect(loadState(storage).restoreAt).toBeNull();
+    storage.setItem(STORAGE_KEY, JSON.stringify({ schemaVersion: 3, entries: [] }));
+    expect(loadState(storage).restoreAt).toBeNull();
+  });
+
+  it('읽기는 삭제 기록을 자르지 않는다 (저장된 것만큼 기억한다)', () => {
+    const many = Array.from({ length: MAX_TOMBSTONES + 3 }, (_, i) => `x${i}`);
+    storage.setItem(STORAGE_KEY, JSON.stringify({ schemaVersion: 3, entries: [entry('live', '2026-03-01')], removed: many }));
+    expect(readStored(storage).state.removed).toHaveLength(MAX_TOMBSTONES + 3);
+    // 쓰기가 붙일 때만 상한이 적용되고, 잘린 개수를 돌려준다.
+    const res = saveEntries([entry('live', '2026-03-01')], ['new-1'], storage);
+    expect(res.removed).toHaveLength(MAX_TOMBSTONES);
+    expect(res.trimmed).toBe(4);
+  });
+
+  it('쓰기에 실패한 비우기는 삭제 기록을 늘리지 않는다', () => {
+    saveState({ ...emptyState(), entries: [entry('a', '2026-03-01')] }, storage);
+    // 저장소는 그대로 두고, 이후 쓰지만 실패하게 만든다(용량 초과·시크릿 모드 흉내).
+    (storage as unknown as { setItem: (k: string, v: string) => void }).setItem = () => {
+      throw new Error('QuotaExceeded');
+    };
+    const res = clearEntries(storage);
+    expect(res.ok).toBe(false);
+    expect(res.removed).toEqual([]);
+    expect(res.trimmed).toBe(0);
+    // 실패한 저장도 화면에 새 삭제 기록을 남기지 않는다.
+    const failed = saveEntries([], ['a'], storage);
+    expect(failed.ok).toBe(false);
+    expect(failed.trimmed).toBe(0);
+  });
 });
