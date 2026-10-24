@@ -1,0 +1,39 @@
+---
+import { p } from '../lib/url';
+
+const base = (import.meta.env.BASE_URL ?? '/').replace(/\/+$/, '');
+const here = Astro.url.pathname.replace(/\/+$/, '');
+const rel = here.startsWith(base) && base !== '' ? here.slice(base.length) || '/' : here || '/';
+
+const links = [
+  { to: '/', label: '홈' },
+  { to: '/guide/', label: '안내' },
+  { to: '/calendar/', label: '신고 일정' },
+  { to: '/tools/receipts/', label: '영수증 정리' },
+  { to: '/tools/checklist/', label: '체크리스트' }
+];
+
+function isCurrent(to: string): boolean {
+  if (to === '/') return rel === '/' || rel === '';
+  const key = to.replace(/\/+$/, '');
+  return rel === key || rel.startsWith(key + '/');
+}
+---
+
+<header class="site-header">
+  <div class="wrap bar">
+    <a class="brand" href={p('/')}>
+      <span class="mark" aria-hidden="true">창</span>
+      <span>모두의 창업 도움</span>
+    </a>
+    <nav class="site-nav" aria-label="주요 메뉴">
+      {
+        links.map((l) => (
+          <a href={p(l.to)} aria-current={isCurrent(l.to) ? 'page' : undefined}>
+            {l.label}
+          </a>
+        ))
+      }
+    </nav>
+  </div>
+</header>

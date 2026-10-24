@@ -1,0 +1,29 @@
+---
+/**
+ * 검증 대기 상태 배너.
+ * status='pending' 문서에서만 렌더링되어, 법적 수치가 아직 확인되지 않았음을 화면에 드러냅니다.
+ */
+interface Props {
+  status: 'verified' | 'pending';
+  note?: string;
+  updatedAt: Date;
+}
+const { status, note, updatedAt } = Astro.props;
+const fmt = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'long' }).format(updatedAt);
+---
+
+{
+  status === 'pending' ? (
+    <aside class="notice" role="status">
+      <strong>이 문서는 출처 검증 대기 중입니다</strong>
+      {note ??
+        '절차와 실무 안내는 그대로 두되, 기한·금액 한도·기준액 같은 법적 수치는 이 문서에 게시하지 않았습니다.'}
+      <br />
+      <span class="small">문서 갱신: {fmt}</span>
+    </aside>
+  ) : (
+    <p class="small muted">
+      절차·방법 중심의 문서입니다 (갱신: {fmt})
+    </p>
+  )
+}

@@ -1,0 +1,69 @@
+---
+import Base from '../layouts/Base.astro';
+import { getCollection } from 'astro:content';
+import { pendingCount, TAX_EVENTS } from '../data/taxFacts';
+import { p } from '../lib/url';
+
+const guides = await getCollection('guides');
+const pendingGuides = guides.filter((g) => g.data.verification === 'pending');
+const verified = guides.filter((g) => g.data.verification === 'verified');
+---
+
+<Base title="정보 이용 안내 (면책)" description="이 사이트의 정보가 언제 틀릴 수 있고, 무엇을 확인해야 하는지 적었습니다." path="/disclaimer/">
+  <h1>정보 이용 안내</h1>
+
+  <p class="notice">
+    <strong>이 사이트는 세무·법률 자문이 아닙니다.</strong>
+    신고·납부, 경비 인정, 인허가 요건 같은 판단은 본인 사업의 실제 상황과 사업자 유형에 따라 달라집니다.
+    관할 세무서, 공식 안내, 세무사 확인이 필요합니다.
+  </p>
+
+  <h2>이 사이트가 틀릴 수 있는 세 가지 경로</h2>
+  <ol>
+    <li><strong>법령·기준 개정</strong> — 세법과 행정 기준은 자주 바뀝니다. 문서에 적힌 갱신일 이후 개정됐을 수 있습니다.</li>
+    <li><strong>업종·유형 차이</strong> — 일반과세자/간이과세자, 개인/법인, 직원 유무, 업종별 인허가에 따라 적용이 갈립니다.</li>
+    <li><strong>아직 검증되지 않은 수치</strong> — 아래 목록처럼 기한·한도·기준액은 비워 두고 확인해야 할 창구만 안내합니다.</li>
+  </ol>
+
+  <h2>현재 검증 상태</h2>
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th scope="col">구분</th><th scope="col">건수</th><th scope="col">의미</th></tr></thead>
+      <tbody>
+        <tr>
+          <th scope="row">절차·방법 중심 문서</th>
+          <td>{verified.length}건</td>
+          <td class="small">법적 수치를 담지 않은 실무 안내입니다. 자체 작성 내용이며, 인용할 법령 값이 없습니다.</td>
+        </tr>
+        <tr>
+          <th scope="row">출처 검증 대기 문서</th>
+          <td>{pendingGuides.length}건</td>
+          <td class="small">분류 이름·제도 언급이 있어 1차 출처 확인이 필요합니다. 화면 상단에 배너가 떠 있습니다.</td>
+        </tr>
+        <tr>
+          <th scope="row">신고 항목 중 기한 미확인</th>
+          <td>{pendingCount()} / {TAX_EVENTS.length}건</td>
+          <td class="small">기한칸은 비어 있고 공식 창구 링크만 제공합니다.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>검증 대기 중인 문서</h3>
+  <ul>
+    {
+      pendingGuides.map((g) => (
+        <li>
+          <a href={p(`/guide/${g.id}/`)}>{g.data.title}</a>
+          <span class="muted small"> — {g.data.verificationNote ?? '법적 수치 미게시'}</span>
+        </li>
+      ))
+    }
+  </ul>
+
+  <h2>verifying 뒤 바뀌는 것</h2>
+  <p>
+    검증이 끝나면 (1) <a href={p('/calendar/')}>신고 일정</a>의 기한칸에 값이 채워지고, (2) 문서 하단 "확인할 곳" 에
+    근거 링크가 추가되며, (3) 각 문서의 갱신일이 바뀝니다. 배너가 사라진 문서만이 검증된 상태입니다.
+  </p>
+</Base>

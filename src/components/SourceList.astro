@@ -1,0 +1,29 @@
+---
+/** 본문 하단에 붙는 공식 출처 목록. 스키마에서 1개 이상 필수로 강제되어 있습니다. */
+interface Source {
+  label: string;
+  url: string;
+}
+interface Props {
+  sources: Source[];
+}
+const { sources } = Astro.props;
+---
+
+{
+  sources.length > 0 && (
+    <section class="no-print" aria-labelledby="src-h">
+      <h2 id="src-h">확인할 곳</h2>
+      <ul>
+        {sources.map((s) => (
+          <li>
+            <a href={s.url} rel="noopener noreferrer external" target="_blank">{s.label}</a>
+          </li>
+        ))}
+      </ul>
+      <p class="small muted">
+        위 링크는 안내 본문에서 직접 계산한 결과가 아니라, 최신 기준을 확인할 수 있는 공식 창구입니다.
+      </p>
+    </section>
+  )
+}

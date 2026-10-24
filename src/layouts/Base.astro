@@ -1,0 +1,48 @@
+---
+import '../styles/global.css';
+import SiteHeader from '../components/SiteHeader.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import { absoluteUrl, p } from '../lib/url';
+
+interface Props {
+  title: string;
+  description?: string;
+  /** canonical 용 내부 경로 (루트 절대경로, base 제외) */
+  path?: string;
+}
+
+const { title, path = '' } = Astro.props;
+const description =
+  Astro.props.description ??
+  '영수증·지출증빙 정리와 창업에 필요한 문서를 한 곳에서. 창업자를 위한 안내와 브라우저에서 도는 정리 도구.';
+const canonical = absoluteUrl(Astro.site, path || Astro.url.pathname);
+---
+
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#1d5fd0" />
+    <meta name="color-scheme" content="light dark" />
+    {canonical && <link rel="canonical" href={canonical} />}
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="ko_KR" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    {canonical && <meta property="og:url" content={canonical} />}
+    <meta name="twitter:card" content="summary" />
+    <link rel="icon" href={p('/favicon.svg')} />
+    <meta name="robots" content="index, follow" />
+  </head>
+  <body>
+    <a class="skip" href="#main">본문 바로가기</a>
+    <SiteHeader />
+    <main id="main" class="wrap">
+      <slot />
+    </main>
+    <SiteFooter />
+  </body>
+</html>

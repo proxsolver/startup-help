@@ -1,0 +1,398 @@
+---
+import { CATEGORIES, EVIDENCE_TYPES, PAY_METHODS } from '../lib/receipts';
+
+const today = new Date().toISOString().slice(0, 10);
+---
+
+<div id="receipt-tool" data-tool>
+  <p class="notice info no-print">
+    <strong>서버에 올라가지 않는 도구입니다</strong>
+    입력한 내용은 이 브라우저의 저장소에만 들어갑니다. 계정을 만들거나 파일을 전송하지 않아도 됩니다.
+    다만 브라우저 데이터를 비우면 사라지므로, 마감 뒤에는 아래 CSV·JSON 내보내기로 백업하세요.
+  </p>
+
+  <div class="card no-print" style="margin-bottom:1.2rem">
+    <h2 style="margin-top:0;font-size:1.05rem;border:0;padding:0">새 지출 추가</h2>
+    <div class="row" role="group" aria-label="지출 입력">
+      <div>
+        <label for="f-date">날짜</label>
+        <input type="date" id="f-date" value={today} required />
+      </div>
+      <div>
+        <label for="f-vendor">거래처</label>
+        <input type="text" id="f-vendor" placeholder="예: 원단상사" autocomplete="off" />
+      </div>
+      <div>
+        <label for="f-amount">금액 (원)</label>
+        <input type="number" id="f-amount" min="0" step="1" placeholder="0" inputmode="numeric" />
+      </div>
+      <div>
+        <label for="f-pay">결제수단</label>
+        <select id="f-pay">{PAY_METHODS.map((m) => <option value={m}>{m}</option>)}</select>
+      </div>
+      <div>
+        <label for="f-evidence">증빙 구분</label>
+        <select id="f-evidence">
+          {EVIDENCE_TYPES.map((t) => <option value={t} selected={t === '없음'}>{t}</option>)}
+        </select>
+      </div>
+      <div>
+        <label for="f-category">분류</label>
+        <select id="f-category">{CATEGORIES.map((c) => <option value={c}>{c}</option>)}</select>
+      </div>
+      <div style="flex:2 1 220px">
+        <label for="f-memo">메모</label>
+        <input type="text" id="f-memo" placeholder="왜 썼는지 한 줄" autocomplete="off" />
+      </div>
+      <div class="shrink">
+        <button class="btn" type="button" data-add>추가</button>
+      </div>
+    </div>
+    <p class="small muted" data-form-msg style="margin:.6rem 0 0"></p>
+  </div>
+
+  <div class="card" style="margin-bottom:1.2rem">
+    <h2 style="margin-top:0;font-size:1.05rem;border:0;padding:0">정리 현황</h2>
+    <div class="row no-print" role="group" aria-label="필터" style="margin-bottom:1rem">
+      <div>
+        <label for="q-from">시작일</label>
+        <input type="date" id="q-from" />
+      </div>
+      <div>
+        <label for="q-to">종료일</label>
+        <input type="date" id="q-to" />
+      </div>
+      <div>
+        <label for="q-category">분류</label>
+        <select id="q-category">
+          <option value="">전체</option>
+          {CATEGORIES.map((c) => <option value={c}>{c}</option>)}
+        </select>
+      </div>
+      <div>
+        <label for="q-evidence">증빙</label>
+        <select id="q-evidence">
+          <option value="">전체</option>
+          {EVIDENCE_TYPES.map((t) => <option value={t}>{t}</option>)}
+        </select>
+      </div>
+      <div style="flex:2 1 200px">
+        <label for="q-text">거래처·메모 검색</label>
+        <input type="search" id="q-text" placeholder="예: 택배" />
+      </div>
+      <div class="shrink">
+        <button class="btn ghost" type="button" data-reset-filters>필터 해제</button>
+      </div>
+    </div>
+
+    <dl data-summary style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.8rem;margin:0 0 1rem">
+      <div><dt class="small muted">총 지출</dt><dd data-sum-total style="margin:0;font-size:1.3rem;font-weight:800">-</dd></div>
+      <div><dt class="small muted">입력 건수</dt><dd data-sum-count style="margin:0;font-size:1.3rem;font-weight:800">-</dd></div>
+      <div><dt class="small muted">정규 증빙으로 표시한 금액</dt><dd data-sum-regular style="margin:0;font-size:1.3rem;font-weight:800">-</dd></div>
+      <div><dt class="small muted">증빙 없음</dt><dd data-sum-missing style="margin:0;font-size:1.3rem;font-weight:800">-</dd></div>
+    </dl>
+
+    <div class="table-scroll">
+      <table>
+        <caption class="small muted" style="text-align:left;caption-side:top">분류별 합계</caption>
+        <thead><tr><th scope="col">분류</th><th scope="col">건수</th><th scope="col">금액</th></tr></thead>
+        <tbody data-by-category><tr><td colspan="3" class="muted">자료가 없습니다</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <caption class="small muted" style="text-align:left;caption-side:top">월별 합계</caption>
+        <thead><tr><th scope="col">월</th><th scope="col">건수</th><th scope="col">금액</th></tr></thead>
+        <tbody data-by-month><tr><td colspan="3" class="muted">자료가 없습니다</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:1.2rem">
+    <h2 style="margin-top:0;font-size:1.05rem;border:0;padding:0">입력 목록 <span class="muted small">(필터 적용된 결과)</span></h2>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">날짜</th><th scope="col">거래처</th><th scope="col">금액</th>
+            <th scope="col">결제</th><th scope="col">증빙</th><th scope="col">분류</th>
+            <th scope="col">메모</th><th scope="col" class="no-print"><span aria-hidden="true">지우기</span></th>
+          </tr>
+        </thead>
+        <tbody data-rows><tr><td colspan="8" class="muted">아직 입력이 없습니다.</td></tr></tbody>
+        <tfoot data-foot hidden>
+          <tr><th scope="row">합계</th><td></td><td data-foot-amount></td><td colspan="5"></td></tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+  <div class="row no-print" style="align-items:start">
+    <div class="shrink"><button class="btn" type="button" data-export-csv>CSV 내보내기</button></div>
+    <div class="shrink"><button class="btn ghost" type="button" data-export-json>JSON 백업</button></div>
+    <div>
+      <label for="import-file">JSON 복원</label>
+      <input type="file" id="import-file" accept="application/json,.json" />
+    </div>
+    <div class="shrink"><button class="btn ghost" type="button" data-clear>모두 지우기</button></div>
+  </div>
+
+  <p class="notice" data-storage-warning hidden>
+    <strong>브라우저 저장에 실패했습니다</strong>
+    시크릿 창이거나 저장 한도를 넘어선 것으로 보입니다. 지금 입력은 새로고침 뒤 사라집니다. JSON 백업을 먼저 받으세요.
+  </p>
+  <p class="small muted" data-status role="status" aria-live="polite"></p>
+</div>
+
+<script>
+  import {
+    computeTotals,
+    csvFileName,
+    currentPeriod,
+    filterEntries,
+    formatKRW,
+    makeId,
+    normalizeEntry,
+    toCsvFile,
+    type Filters,
+    type ReceiptEntry
+  } from '../lib/receipts';
+  import { backupFileName, emptyState, loadState, saveState, serializeState, parseBackup, clearState } from '../lib/storage';
+
+  const root = document.querySelector<HTMLElement>('[data-tool]');
+
+  if (root) {
+    const el = (name: string): HTMLElement | null => root.querySelector(`[data-${name}]`);
+    const val = (id: string) => (document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null)?.value ?? '';
+    const rowsBody = el('rows');
+    const foot = el('foot');
+    const footAmount = el('foot-amount');
+    const status = el('status');
+    const formMsg = el('form-msg');
+    const warning = el('storage-warning');
+
+    let state = loadState();
+    let filters: Filters = {};
+
+    function field(id: string): string {
+      return val(id).trim();
+    }
+
+    function download(name: string, text: string, type: string) {
+      const blob = new Blob([text], { type });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    function cell(text: string, bold = false): HTMLElement {
+      const td = document.createElement('td');
+      td.textContent = text;
+      if (bold) td.style.fontWeight = '700';
+      return td;
+    }
+
+    function render() {
+      const list = filterEntries(state.entries, filters);
+      const totals = computeTotals(list);
+
+      const sum = (name: string, text: string) => {
+        const node = el(name);
+        if (node) node.textContent = text;
+      };
+      sum('sum-total', formatKRW(totals.total));
+      sum('sum-count', `${totals.count}건`);
+      sum('sum-regular', `${formatKRW(totals.regularTotal)} (${totals.regularRate}%)`);
+      sum('sum-missing', `${totals.missingEvidence}건`);
+
+      const fillGroup = (name: string, groups: { key: string; count: number; total: number }[]) => {
+        const tbody = el(name);
+        if (!tbody) return;
+        tbody.textContent = '';
+        if (groups.length === 0) {
+          const tr = document.createElement('tr');
+          const td = document.createElement('td');
+          td.colSpan = 3;
+          td.className = 'muted';
+          td.textContent = '자료가 없습니다';
+          tr.appendChild(td);
+          tbody.appendChild(tr);
+          return;
+        }
+        for (const g of groups) {
+          const tr = document.createElement('tr');
+          const th = document.createElement('th');
+          th.scope = 'row';
+          th.textContent = g.key;
+          tr.appendChild(th);
+          tr.appendChild(cell(`${g.count}건`));
+          tr.appendChild(cell(formatKRW(g.total), true));
+          tbody.appendChild(tr);
+        }
+      };
+      fillGroup('by-category', totals.byCategory);
+      fillGroup('by-month', totals.byMonth);
+
+      if (rowsBody) {
+        rowsBody.textContent = '';
+        if (list.length === 0) {
+          const tr = document.createElement('tr');
+          const td = document.createElement('td');
+          td.colSpan = 8;
+          td.className = 'muted';
+          td.textContent = '조건에 맞는 입력이 없습니다.';
+          tr.appendChild(td);
+          rowsBody.appendChild(tr);
+        }
+        for (const e of list) {
+          const tr = document.createElement('tr');
+          tr.appendChild(cell(e.date));
+          tr.appendChild(cell(e.vendor || '-'));
+          tr.appendChild(cell(formatKRW(e.amount)));
+          tr.appendChild(cell(e.payMethod));
+          tr.appendChild(cell(e.evidenceType));
+          tr.appendChild(cell(e.category));
+          tr.appendChild(cell(e.memo));
+          const td = document.createElement('td');
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'btn ghost small';
+          btn.textContent = '지우기';
+          btn.dataset.id = e.id;
+          btn.addEventListener('click', () => remove(e.id));
+          td.appendChild(btn);
+          tr.appendChild(td);
+          rowsBody.appendChild(tr);
+        }
+      }
+      if (foot && footAmount) {
+        foot.hidden = list.length === 0;
+        footAmount.textContent = formatKRW(totals.total);
+      }
+      if (status) {
+        status.textContent = `전체 ${state.entries.length}건 중 ${list.length}건 표시 · 데이터는 이 브라우저에만 저장됩니다`;
+      }
+    }
+
+    function persist() {
+      const ok = saveState(state);
+      if (warning) warning.hidden = ok;
+    }
+
+    function remove(id: string) {
+      const before = state.entries.length;
+      state.entries = state.entries.filter((e) => e.id !== id);
+      if (state.entries.length !== before) {
+        persist();
+        render();
+      }
+    }
+
+    function add() {
+      const entry = normalizeEntry({
+        id: makeId(),
+        date: field('f-date'),
+        vendor: field('f-vendor'),
+        amount: Number(field('f-amount')),
+        payMethod: val('f-pay'),
+        evidenceType: val('f-evidence'),
+        category: val('f-category'),
+        memo: field('f-memo')
+      });
+      if (!entry) {
+        if (formMsg) formMsg.textContent = '날짜와 0 이상의 금액이 필요합니다.';
+        return;
+      }
+      state.entries.push(entry);
+      state.entries.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+      persist();
+      render();
+      if (formMsg) formMsg.textContent = `${entry.date} · ${entry.vendor || '이름 없음'} ${formatKRW(entry.amount)} 추가됨`;
+      const vendor = document.getElementById('f-vendor') as HTMLInputElement | null;
+      const amount = document.getElementById('f-amount') as HTMLInputElement | null;
+      const memo = document.getElementById('f-memo') as HTMLInputElement | null;
+      if (vendor) vendor.value = '';
+      if (amount) amount.value = '';
+      if (memo) memo.value = '';
+      vendor?.focus();
+    }
+
+    el('add')?.addEventListener('click', add);
+
+    const syncFilters = () => {
+      filters = {
+        from: field('q-from') || undefined,
+        to: field('q-to') || undefined,
+        category: val('q-category') || undefined,
+        evidenceType: val('q-evidence') || undefined,
+        q: field('q-text') || undefined
+      };
+      render();
+    };
+    for (const id of ['q-from', 'q-to', 'q-category', 'q-evidence', 'q-text']) {
+      const node = document.getElementById(id);
+      node?.addEventListener('change', syncFilters);
+      if (node instanceof HTMLInputElement && node.type === 'search') node.addEventListener('input', syncFilters);
+    }
+    el('reset-filters')?.addEventListener('click', () => {
+      for (const id of ['q-from', 'q-to', 'q-category', 'q-evidence', 'q-text']) {
+        const node = document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null;
+        if (node) node.value = '';
+      }
+      filters = {};
+      render();
+    });
+
+    el('export-csv')?.addEventListener('click', () => {
+      const visible = filterEntries(state.entries, filters);
+      const source = visible.length > 0 ? visible : state.entries;
+      if (source.length === 0) {
+        if (status) status.textContent = '내보낼 데이터가 없습니다.';
+        return;
+      }
+      download(csvFileName(currentPeriod()), toCsvFile(source), 'text/csv;charset=utf-8');
+    });
+
+    el('export-json')?.addEventListener('click', () => {
+      download(backupFileName(), serializeState(state), 'application/json;charset=utf-8');
+    });
+
+    const fileInput = document.getElementById('import-file') as HTMLInputElement | null;
+    fileInput?.addEventListener('change', () => {
+      const file = fileInput.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const text = String(reader.result ?? '');
+        const { state: restored, dropped } = parseBackup(text);
+        if (restored.entries.length === 0 && !confirm('이 파일에서 읽을 수 있는 지출 항목이 없습니다. 현재 데이터를 그대로 둘까요?')) {
+          return;
+        }
+        if (!confirm(`${restored.entries.length}건을 복원합니다. 현재 목록(${state.entries.length}건)은 대체됩니다.`)) return;
+        state = restored;
+        persist();
+        render();
+        if (status) status.textContent = dropped > 0 ? `복원 완료 · 형식 오류 ${dropped}건은 건너뛰었습니다` : '복원 완료';
+        fileInput.value = '';
+      };
+      reader.readAsText(file, 'utf-8');
+    });
+
+    el('clear')?.addEventListener('click', () => {
+      if (state.entries.length === 0 && Object.keys(state.checklist).length === 0) return;
+      if (!confirm('이 브라우저에 저장된 지출 목록을 모두 지웁니다. 되돌릴 수 없습니다. 계속할까요?')) return;
+      clearState();
+      state = emptyState();
+      render();
+      if (status) status.textContent = '저장된 지출 목록을 비웠습니다.';
+    });
+
+    render();
+  }
+</script>

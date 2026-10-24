@@ -1,0 +1,44 @@
+---
+import { p } from '../lib/url';
+import { pendingCount } from '../data/taxFacts';
+import { getCollection } from 'astro:content';
+
+const buildDate = new Date();
+let pendingGuides = 0;
+try {
+  const guides = await getCollection('guides');
+  pendingGuides = guides.filter((g) => g.data.verification === 'pending').length;
+} catch {
+  pendingGuides = 0;
+}
+const pendingTax = pendingCount();
+const year = buildDate.getFullYear();
+---
+
+<footer class="site-footer">
+  <div class="wrap">
+    <nav aria-label="사이트 정보">
+      <a href={p('/about/')}>이 사이트 안내</a>
+      <a href={p('/disclaimer/')}>정보 이용 안내</a>
+      <a href={p('/privacy/')}>개인정보 처리방침</a>
+      <a href={p('/terms/')}>이용약관</a>
+      <a href="https://github.com/proxsolver/startup-help">저장소</a>
+    </nav>
+    <p>
+      <strong>이 사이트는 세무·법률 자문을 제공하지 않습니다.</strong><br />
+      안내 내용은 창업 실무를 정리한 참고 정보입니다. 신고·납부, 경비 인정, 인허가 여부는
+      관할 세무서·공식 안내 또는 세무사 등 전문가 확인이 필요합니다.
+    </p>
+    {
+      pendingGuides + pendingTax > 0 && (
+        <p class="small">
+          ⚠️ 현재 안내 문서 {pendingGuides}건과 신고 항목 {pendingTax}건의 기한·기준 수치가 1차 출처
+          검증을 기다리고 있습니다. 검증 전에는 수치를 게시하지 않습니다.
+        </p>
+      )
+    }
+    <p class="small">
+      데이터는 서버로 전송되지 않고 사용자의 브라우저에만 저장됩니다 · 빌드 {year}.{String(buildDate.getMonth() + 1).padStart(2, '0')}.{String(buildDate.getDate()).padStart(2, '0')}
+    </p>
+  </div>
+</footer>

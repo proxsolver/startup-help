@@ -1,0 +1,124 @@
+---
+import { CHECKLIST } from '../data/checklists';
+import { p } from '../lib/url';
+
+interface Props {
+  /** 특정 단계만 보여주려면 stage id 를 지정합니다. */
+  only?: string;
+}
+const { only } = Astro.props;
+const stages = only ? CHECKLIST.filter((s) => s.id === only) : CHECKLIST;
+const totalItems = stages.reduce((n, s) => n + s.items.length, 0);
+---
+
+<div id="checklist" data-checklist>
+  <div class="card" style="margin-bottom:1.4rem">
+    <p style="display:flex;justify-content:space-between;margin:0 0 .5rem">
+      <strong>전체 진행률</strong>
+      <span class="muted small" data-overall-text>0 / {totalItems}</span>
+    </p>
+    <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-overall-bar>
+      <i data-overall-fill></i>
+    </div>
+    <p class="small muted" style="margin:.6rem 0 0">
+      체크 상태는 서버로 전송되지 않고 이 브라우저에만 저장됩니다. 기기를 바꾸면 저장한 목록이 함께 옮기지 않는 한 사라집니다.
+    </p>
+  </div>
+
+  {
+    stages.map((stage) => (
+      <section class="stage" data-stage={stage.id}>
+        <h2 style="margin-top:0">
+          {stage.title}
+          <span class="badge" data-stage-count>{stage.items.length}개</span>
+        </h2>
+        <p class="muted">{stage.intro}</p>
+        <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-stage-bar>
+          <i data-stage-fill></i>
+        </div>
+        <ul style="list-style:none;padding:0;margin:.8rem 0 0">
+          {stage.items.map((item) => (
+            <li class="check-item" data-item>
+              <input
+                type="checkbox"
+                id={`c-${item.id}`}
+                data-id={item.id}
+              />
+              <div>
+                <label class="label" for={`c-${item.id}`} style="font-weight:600;font-size:1rem">
+                  {item.label}
+                </label>
+                {item.why && <p class="small muted" style="margin:.15rem 0">{item.why}</p>}
+                <p class="small" style="margin:.2rem 0 0">
+                  {item.guide && <a href={p(item.guide)}>관련 안내</a>}
+                  {item.guide && item.link && <span class="muted"> · </span>}
+                  {item.link && (
+                    <a href={item.link.url} rel="noopener noreferrer external" target="_blank">
+                      {item.link.label}
+                    </a>
+                  )}
+                </p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </section>
+    ))
+  }
+
+  <p class="notice" data-storage-warning hidden>
+    <strong>이 브라우저에는 저장할 수 없습니다</strong>
+    시크릿 창이거나 저장 공간이 막혀 있어 체크 상태가 새로고침 뒤 사라집니다. 창을 일반 모드로 바꿔 주세요.
+  </p>
+</div>
+
+<script>
+  import { loadState, saveState } from '../lib/storage';
+
+  const root = document.querySelector('[data-checklist]');
+  if (root instanceof HTMLElement) {
+    const boxes = Array.from(root.querySelectorAll<HTMLInputElement>('input[type="checkbox"][data-id]'));
+    const warning = root.querySelector<HTMLElement>('[data-storage-warning]');
+    const overallFill = root.querySelector<HTMLElement>('[data-overall-fill]');
+    const overallBar = root.querySelector<HTMLElement>('[data-overall-bar]');
+    const overallText = root.querySelector<HTMLElement>('[data-overall-text]');
+
+    const state = loadState();
+
+    function refresh() {
+      let done = 0;
+      for (const box of boxes) if (box.checked) done++;
+      const pct = boxes.length ? Math.round((done / boxes.length) * 100) : 0;
+      if (overallFill) overallFill.style.width = `${pct}%`;
+      if (overallBar) overallBar.setAttribute('aria-valuenow', String(pct));
+      if (overallText) overallText.textContent = `${done} / ${boxes.length} 완료`;
+
+      for (const stage of Array.from(root!.querySelectorAll<HTMLElement>('[data-stage]'))) {
+        const items = Array.from(stage.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'));
+        const n = items.filter((i) => i.checked).length;
+        const p2 = items.length ? Math.round((n / items.length) * 100) : 0;
+        const fill = stage.querySelector<HTMLElement>('[data-stage-fill]');
+        const bar = stage.querySelector<HTMLElement>('[data-stage-bar]');
+        const badge = stage.querySelector<HTMLElement>('[data-stage-count]');
+        if (fill) fill.style.width = `${p2}%`;
+        if (bar) bar.setAttribute('aria-valuenow', String(p2));
+        if (badge) badge.textContent = `${n}/${items.length} 완료`;
+        for (const li of Array.from(stage.querySelectorAll<HTMLElement>('[data-item]'))) {
+          const box = li.querySelector<HTMLInputElement>('input[type="checkbox"]');
+          li.classList.toggle('done', !!box?.checked);
+        }
+      }
+    }
+
+    for (const box of boxes) {
+      box.checked = state.checklist[box.dataset.id ?? ''] === true;
+      box.addEventListener('change', () => {
+        state.checklist[box.dataset.id ?? ''] = box.checked;
+        const ok = saveState(state);
+        if (warning) warning.hidden = ok;
+        refresh();
+      });
+    }
+    refresh();
+  }
+</script>

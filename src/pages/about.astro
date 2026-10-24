@@ -1,0 +1,51 @@
+---
+import Base from '../layouts/Base.astro';
+import { p } from '../lib/url';
+import { pendingCount } from '../data/taxFacts';
+---
+
+<Base title="이 사이트 안내" description="사이트가 무엇을 담고 무엇을 담지 않는지, 데이터는 어디에 저장되는지 적었습니다." path="/about/">
+  <h1>이 사이트 안내</h1>
+  <p class="measure">
+    예비창업자와 개업 직후 사업자를 위한 참고 사이트입니다. 두 가지 문제를 다루려 만들어졌습니다.
+    <strong>첫째</strong>, 지출할 때 어떤 서류를 받아야 하는지 몰라 나중에 되돌아가는 일.
+    <strong>둘째</strong>, 정리할 곳이 없어 카드 명세와 영수증 뭉치가 흩어지는 일.
+  </p>
+
+  <h2>담는 것</h2>
+  <ul>
+    <li>증빙 종류 구분과 결제수단별 기록의 형태</li>
+    <li>창업에 필요한 문서가 어디서 나오는지에 대한 창구 안내</li>
+    <li>월 마감·신고 준비 순서 같은 실무 절차</li>
+    <li>서버 없이 브라우저 안에서 도는 정리 도구와 체크리스트</li>
+  </ul>
+
+  <h2>담지 않는 것</h2>
+  <ul>
+    <li><strong>세무·법률 자문</strong> — 이 사이트는 자격이 없습니다. 최종 판단은 관할 세무서·공식 안내·세무사 확인이 필요합니다.</li>
+    <li><strong>증빙 사진 인식(OCR)이나 자동 분류</strong> — 아직 만들지 않았습니다. 개인 정보를 서버로 받지 않는 구조를 유지하면서 할 수 있는 방법을 먼저 검토합니다.</li>
+    <li><strong>기한·한도·기준액의 임의 게시</strong> — 현재 {pendingCount()}개 신고 항목과 다수 문서의 법적 수치가 검증 대기 중이며, 화면에 "확인 필요" 로 비워 두었습니다.</li>
+    <li><strong>계정·구독</strong> — 회원가입이 없습니다.</li>
+  </ul>
+
+  <h2>데이터 처리 원칙</h2>
+  <p>
+    정리 도구와 체크리스트가 쓰는 저장소는 <code>window.localStorage</code> 하나입니다. 서버가 없어 보내는 곳도,
+    저장하는 곳도 없습니다. <a href={p('/privacy/')}>개인정보 처리방침</a>에 상세히 적었습니다.
+  </p>
+
+  <h2>만들고 고치는 사람</h2>
+  <p>
+    한 사람이 만들고 있으며, 소스는 공개되어 있습니다. 잘못된 표현·빠진 주제는 issue로 알려 주세요.
+    세법 기준이 바뀌면 해당 문서의 출처 링크와 갱신일이 함께 바뀝니다.
+  </p>
+  <p><a href="https://github.com/proxsolver/startup-help">github.com/proxsolver/startup-help</a></p>
+
+  <h2>로컬에서 실행·편집</h2>
+  <pre><code>git clone https://github.com/proxsolver/startup-help.git
+cd startup-help
+npm install
+npm run dev      # http://localhost:4321 (ASTRO_LOCAL=1 npm run dev 로 켜면 base 경로 없이)
+npm test         # 정리 도구 로직 단위 테스트
+npm run build    # dist/ 에 정적 파일 생성</code></pre>
+</Base>

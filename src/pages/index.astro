@@ -1,0 +1,104 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '../layouts/Base.astro';
+import { p } from '../lib/url';
+import { pendingCount } from '../data/taxFacts';
+
+const guides = (await getCollection('guides')).sort(
+  (a, b) =>
+    a.data.category.localeCompare(b.data.category) ||
+    a.data.order - b.data.order ||
+    a.data.title.localeCompare(b.data.title)
+);
+
+const categories = [
+  { key: 'receipts', title: '영수증·지출증빙', desc: '무엇을 받아야 하고, 어떻게 정리하는지' },
+  { key: 'documents', title: '창업 문서', desc: '사업자등록·인허가·4대보험·서식 발급 창구' },
+  { key: 'tax', title: '신고 준비', desc: '캘린더를 읽고 자료 준비 순서' },
+  { key: 'launch', title: '개업 초기', desc: '첫 90일 배치' }
+] as const;
+
+const pendingGuides = guides.filter((g) => g.data.verification === 'pending').length;
+const pendingTax = pendingCount();
+const featured = guides.filter((g) => g.data.order <= 2).slice(0, 6);
+---
+
+<Base
+  title="모두의 창업 도움 — 영수증 정리와 필수 문서 안내"
+  description="예비창업자와 초기 사업자를 위해 영수증·지출증빙 정리법, 창업 필수 문서, 신고 준비 순서를 안내합니다. 데이터는 서버에 전송하지 않습니다."
+  path="/"
+>
+  <section style="padding:2.2rem 0 1.2rem">
+    <h1>영수증 정리와 창업 문서,<br />혼자서도 할 수 있게</h1>
+    <p class="measure" style="font-size:1.06rem">
+      사업자등록을 막 끝낸 사람에게 가장 먼저 무너지는 것은 장부가 아니라 <strong>영수증 정리</strong>입니다.
+      이 사이트는 (1) 어떤 증빙을 받아야 하는지 구분하는 안내, (2) 창업에 필요한 문서와 발급 창구,
+      (3) 신고 준비 순서, (4) 브라우저 안에서 도는 영수증 정리 도구를 제공합니다.
+    </p>
+    <div class="row no-print" style="max-width:520px;margin-top:1.2rem">
+      <a class="btn" href={p('/tools/receipts/')} style="text-align:center;text-decoration:none">영수증 정리 도구 열기</a>
+      <a class="btn ghost" href={p('/tools/checklist/')} style="text-align:center;text-decoration:none">체크리스트</a>
+    </div>
+  </section>
+
+  <aside class="notice">
+    <strong>숫자(기한·한도·기준액)는 검증된 것만 게시합니다</strong>
+    이 사이트는 세무·법률 자문이 아니라 실무 안내입니다. 현재 안내 문서 {pendingGuides}건과 신고 항목 {pendingTax}건의
+    법적 수치가 1차 출처(국세청·홈택스·법령·정부24) 검증을 기다리고 있어 비워 두었습니다.
+    검증이 끝나는 대로 기한과 기준을 채우고, 각 문서 하단에 출처를 함께 표시합니다.
+    신고·경비 인정 여부는 반드시 관할 세무서 또는 세무사 확인이 필요합니다.
+  </aside>
+
+  <section>
+    <h2>문서로 찾기</h2>
+    <div class="grid">
+      {
+        categories.map((c) => (
+          <article class="card">
+            <h3>
+              <a href={p(`/guide/${c.key}/`)}>{c.title}</a>
+            </h3>
+            <p>{c.desc}</p>
+            <p class="small" style="margin-top:.6rem">
+              <a href={p(`/guide/${c.key}/`)}>{guides.filter((g) => g.data.category === c.key).length}건 보기</a>
+            </p>
+          </article>
+        ))
+      }
+    </div>
+  </section>
+
+  <section>
+    <h2>많이 찾는 순서대로</h2>
+    <ul>
+      {
+        featured.map((g) => (
+          <li>
+            <a href={p(`/guide/${g.id}/`)}>{g.data.title}</a>
+            <span class="muted small"> — {g.data.summary}</span>
+            {g.data.verification === 'pending' && <span class="badge warn">검증 대기</span>}
+          </li>
+        ))
+      }
+    </ul>
+    <p><a href={p('/guide/')}>전체 안내 보기 →</a></p>
+  </section>
+
+  <section>
+    <h2>도구</h2>
+    <div class="grid">
+      <article class="card">
+        <h3><a href={p('/tools/receipts/')}>영수증 정리 도구</a></h3>
+        <p>지출을 한 줄씩 넣고 분류·증빙 구분으로 집계합니다. CSV·JSON 내보내기 지원. 입력 내용은 이 브라우저를 벗어나지 않습니다.</p>
+      </article>
+      <article class="card">
+        <h3><a href={p('/tools/checklist/')}>창업 체크리스트</a></h3>
+        <p>개업 전 · 첫 달 · 신고 준비 3단계로 나뉜 항목 목록. 진행률이 브라우저에 저장됩니다.</p>
+      </article>
+      <article class="card">
+        <h3><a href={p('/calendar/')}>신고 일정</a></h3>
+        <p>어떤 항목이 본인에게 해당되는지 걸러내는 화면. 기한은 검증된 것만 표시됩니다.</p>
+      </article>
+    </div>
+  </section>
+</Base>

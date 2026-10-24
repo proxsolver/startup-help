@@ -1,0 +1,86 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+import { CATEGORY_META, AUDIENCE_LABEL } from '../../data/categories';
+import { p } from '../../lib/url';
+
+const guides = (await getCollection('guides')).sort(
+  (a, b) => a.data.order - b.data.order || a.data.title.localeCompare(b.data.title)
+);
+---
+
+<Base
+  title="안내 문서 전체"
+  description="영수증·지출증빙, 창업 문서, 신고 준비, 개업 초기 안내를 한 목록에서 찾습니다."
+  path="/guide/"
+>
+  <h1>안내 문서</h1>
+  <p class="muted measure">
+    {guides.length}건의 문서가 분류별로 정리되어 있습니다. 아래 입력창으로 제목·요약에서 즉시 찾을 수 있습니다.
+  </p>
+
+  <p class="no-print" style="max-width:420px">
+    <label for="search">검색</label>
+    <input type="search" id="search" placeholder="예: 현금영수증, 사업자등록" />
+  </p>
+
+  {
+    CATEGORY_META.map((c) => {
+      const list = guides.filter((g) => g.data.category === c.key);
+      if (list.length === 0) return null;
+      return (
+        <section data-group={c.key}>
+          <h2>
+            <a href={p(`/guide/${c.key}/`)}>{c.title}</a>
+            <span class="badge">{list.length}건</span>
+          </h2>
+          <p class="muted small">{c.desc}</p>
+          <div class="grid">
+            {list.map((g) => (
+              <article class="card" data-search-item data-hay={`${g.data.title} ${g.data.summary} ${g.data.tags.join(' ')} ${AUDIENCE_LABEL[g.data.audience[0]] ?? ''}`}>
+                <h3>
+                  <a href={p(`/guide/${g.id}/`)}>{g.data.title}</a>
+                </h3>
+                <p>{g.data.summary}</p>
+                <p class="small" style="margin-top:.6rem">
+                  {g.data.audience.map((a) => <span class="badge">{AUDIENCE_LABEL[a] ?? a}</span>)}
+                  {g.data.verification === 'pending' && <span class="badge warn">수치 검증 대기</span>}
+                </p>
+              </article>
+            ))}
+          </div>
+        </section>
+      );
+    })
+  }
+
+  <p class="notice no-print" data-search-empty hidden>
+    <strong>검색 결과가 없습니다</strong>
+    다른 표현으로 시도해 보세요. 예: "영수증", "카드", "발급", "4대보험". 아직 없는 주제는 찾으려는 정보의 공식 창구 링크가
+    <a href={p('/about/')}>이 사이트 안내</a>에 정리되어 있습니다.
+  </p>
+</Base>
+
+<script>
+  const input = document.getElementById('search') as HTMLInputElement | null;
+  const items = Array.from(document.querySelectorAll<HTMLElement>('[data-search-item]'));
+  const empty = document.querySelector<HTMLElement>('[data-search-empty]');
+
+  function run() {
+    const q = (input?.value ?? '').trim().toLowerCase();
+    let shown = 0;
+    for (const item of items) {
+      const hay = (item.dataset.hay ?? '').toLowerCase();
+      const hit = !q || hay.includes(q);
+      item.hidden = !hit;
+      if (hit) shown++;
+    }
+    for (const group of Array.from(document.querySelectorAll<HTMLElement>('[data-group]'))) {
+      const visible = Array.from(group.querySelectorAll<HTMLElement>('[data-search-item]')).some((i) => !i.hidden);
+      group.hidden = !visible;
+    }
+    if (empty) empty.hidden = shown > 0;
+  }
+
+  input?.addEventListener('input', run);
+</script>

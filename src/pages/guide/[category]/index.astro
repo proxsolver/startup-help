@@ -1,0 +1,46 @@
+---
+import { getCollection, render } from 'astro:content';
+import Base from '../../../layouts/Base.astro';
+import { CATEGORY_META, categoryDesc } from '../../../data/categories';
+import { p } from '../../../lib/url';
+
+export function getStaticPaths() {
+  return CATEGORY_META.map((c) => ({ params: { category: c.key } }));
+}
+
+const { category } = Astro.params as { category: string };
+const guides = (await getCollection('guides', (entry) => entry.data.category === category)).sort(
+  (a, b) => a.data.order - b.data.order || a.data.title.localeCompare(b.data.title)
+);
+const title = `${categoryDesc(category)} — ${CATEGORY_META.find((c) => c.key === category)?.title ?? category}`;
+---
+
+<Base title={CATEGORY_META.find((c) => c.key === category)?.title ?? category} description={categoryDesc(category)} path={`/guide/${category}/`}>
+  <p class="small"><a href={p('/guide/')}>안내 전체</a> › {CATEGORY_META.find((c) => c.key === category)?.title}</p>
+  <h1>{CATEGORY_META.find((c) => c.key === category)?.title}</h1>
+  <p class="muted measure">{categoryDesc(category)}</p>
+
+  {
+    guides.length === 0 ? (
+      <p class="notice">이 분류에는 아직 문서가 없습니다. 다른 분류를 이용해 주세요.</p>
+    ) : (
+      <div class="grid">
+        {guides.map((g) => (
+          <article class="card">
+            <h3>
+              <a href={p(`/guide/${g.id}/`)}>{g.data.title}</a>
+            </h3>
+            <p>{g.data.summary}</p>
+            {g.data.verification === 'pending' && <p class="small"><span class="badge warn">수치 검증 대기</span></p>}
+          </article>
+        ))}
+      </div>
+    )
+  }
+
+  <p style="margin-top:2rem">
+    <a href={p('/tools/receipts/')}>영수증 정리 도구</a> ·
+    <a href={p('/tools/checklist/')}>체크리스트</a> ·
+    <a href={p('/calendar/')}>신고 일정</a>
+  </p>
+</Base>

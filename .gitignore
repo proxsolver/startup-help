@@ -1,0 +1,10 @@
+dependencies/
+build/
+dist/
+node_modules/
+.astro/
+*.log
+.env
+.env.*
+.DS_Store
+coverage/

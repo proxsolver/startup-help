@@ -1,0 +1,45 @@
+---
+import Base from '../../layouts/Base.astro';
+import ReceiptTool from '../../components/ReceiptTool.astro';
+import { p } from '../../lib/url';
+---
+
+<Base
+  title="영수증 정리 도구"
+  description="지출을 한 줄씩 입력해 분류·증빙 구분으로 집계하고 CSV·JSON으로 내보냅니다. 데이터는 브라우저에만 저장됩니다."
+  path="/tools/receipts/"
+>
+  <h1>영수증 정리 도구</h1>
+  <p class="measure muted">
+    카드 내역·현금영수증·세금계산서를 한 달치 모아서 넣으면 분류별·월별 합계가 나옵니다.
+    <strong>정규 증빙으로 표시한 금액</strong>은 이 도구가 인정을 판정하는 항목이 아니라, 당신이 어떤 서류를 받았는지
+    고른 분류의 합계입니다. 인정 여부와 한도는 세무 확인이 필요합니다.
+  </p>
+
+  <ReceiptTool />
+
+  <h2>쓰는 순서</h2>
+  <ol>
+    <li>하루치 지출을 그때그때 한 줄 넣습니다. 증빙을 아직 못 받았다면 구분 <code>없음</code>으로 넣고 메모에 사정을 적습니다.</li>
+    <li>월이 바뀌면 시작일·종료일로 필터하고 카드사·은행 내역 총액과 대조합니다.</li>
+    <li>증빙 구분 <code>없음</code>으로 필터해 재요청할 목록을 세어 봅니다.</li>
+    <li>CSV 내보내기로 엑셀용 파일을, JSON 백업으로 이관용 파일을 받습니다.</li>
+    <li>세무사 상담 시에는 CSV와 목록 인쇄본을 함께 씁니다. (이 페이지는 인쇄 시 버튼·필터가 가려지도록 되어 있습니다)</li>
+  </ol>
+
+  <h2>자주 겪는 일</h2>
+  <table>
+    <thead><tr><th scope="col">상황</th><th scope="col">하면 되는 것</th></tr></thead>
+    <tbody>
+      <tr><td>새로고침했더니 목록이 비었다</td><td>시크릿 창이거나 브라우저 데이터가 비워진 경우입니다. JSON 복원으로 되돌리세요.</td></tr>
+      <tr><td>다른 PC에서 계속 쓰고 싶다</td><td>JSON 백업을 받아 다른 브라우저에서 복원합니다. 동시에 두 기기에서 쓰면 마지막 저장본만 남습니다.</td></tr>
+      <tr><td>CSV를 열면 한글이 깨진다</td><td>엑셀로 열기(UTF-8)를 쓰거나, 이 사이트의 CSV는 BOM을 넣어 두었으므로 파일 열기 방식을 바꿔 보세요.</td></tr>
+      <tr><td>금액이 안 들어간다</td><td>숫자만 입력됩니다. 쉼표·원 기호는 빼 주세요.</td></tr>
+    </tbody>
+  </table>
+
+  <p>
+    <a href={p('/guide/receipts/monthly-close/')}>월 마감 루틴 만들기</a> ·
+    <a href={p('/guide/receipts/regular-evidence/')}>증빙 종류 안내</a>
+  </p>
+</Base>
