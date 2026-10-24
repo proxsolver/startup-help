@@ -50,7 +50,13 @@ const pending = pendingCount();
               <th scope="row">{e.label}</th>
               <td>
                 {e.verification === 'verified' && e.dueText ? (
-                  <strong>{e.dueText}</strong>
+                  e.sources.some((s) => /law\.go\.kr|nts\.go\.kr|hometax\.go\.kr/.test(s.url)) ? (
+                    <strong>{e.dueText}</strong>
+                  ) : (
+                    <>
+                      {e.dueText} <span class="badge">이 사이트 권장</span>
+                    </>
+                  )
                 ) : (
                   <span class="badge warn">시점 확인 필요</span>
                 )}

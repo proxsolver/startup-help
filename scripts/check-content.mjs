@@ -11,7 +11,11 @@
  *   6) 컴포넌트·데이터 코드에 적힌 링크도 실제 라우트인지 검사한다(주석 속 예시는 제외)
  *   7) 화면에 찍히는 게시 데이터(src/data/schedule.ts)도 같은 규칙을 따른다 — pending 항목은
  *      시점 칸을 채울 수 없고, 설명에 검증 안 된 수치를 쓰지 못하며, 확인 창구 링크와
- *      '값이 확정되는 자리(decidedBy)' 를 반드시 갖는다
+ *      '값이 확정되는 자리(decidedBy)' 를 반드시 갖는다. verification 칸도 반드시 적는다(빠지면 실패).
+ *   8) pending → verified 로 값만 바꾸면 위 수치 금지가 전부 풀린다. 그래서 검증 완료 문서·항목은
+ *      수치·조항을 적는 경우 그 자리에서 다시 확인할 수 있는 원문 링크(law·nts·hometax)와
+ *      제N조 인용 시 국가법령정보센터 링크를 함께 요구한다. 링크가 이 사이트(self)뿐이면
+ *      '자체 권장'임이 드러나 있는지 본다 — 기관 요구로 오해되면 안 됩니다.
  *
  * 사용: node scripts/check-content.mjs   (npm run check:content)
  */
@@ -73,15 +77,23 @@ const categoryRoutes = [...categoryKeys].map((c) => `/guide/${c}/`);
 const known = new Set([...STATIC_ROUTES, ...ids, ...categoryRoutes]);
 
 const FORBIDDEN_WHILE_PENDING = [
-  { re: /\d[\d,]*\s*원\b/, why: '원 단위 금액' },
+  // 주의: 한국어는 JS 정규식에서 \w 가 아니라서 \b 를 붙이면 '원'·'일' 뒤에서 절대 매칭되지 않습니다.
+  { re: /\d[\d,]*\s*원/, why: '원 단위 금액' },
   { re: /\d\s*만원/, why: '금액 한도' },
   { re: /\d\s*억원/, why: '금액 기준' },
   { re: /[일이삼사오육칠팔구십]+만원/, why: '한글 수량 금액' },
   { re: /가산세/, why: '제재 표현' },
   { re: /제\s?\d+조/, why: '법령 조항 인용' },
-  { re: /\d+\s*년\s*(간\s*)?보존|보존기간\s*(은|이)?\s*\d|\d+\s*년간\s*(보관|보존)/, why: '보존기간 수치' },
+  { re: /\d+\s*년\s*(간\s*)?(보관|보존)|\d+\s*년간\s*(보관|보존)/, why: '보존·보관기간 수치' },
+  { re: /\d+\s*월\s*\d+\s*일/, why: '날짜 기한' },
+  { re: /\d+\s*[.]\s*\d+\s*[.]\s*\d+/, why: '날짜 기한' },
   { re: /기한은\s*\d+|\d+\s*(일|개월)\s*(이내|안에|까지)/, why: '기한 수치' }
 ];
+
+/** 본문에 법적 수치·조항이 있는지 보는 패턴 (verified 문서의 출처 강요용) */
+const LEGAL_FIGURE = [/제\s?\d+조/, /\d\s*(만원|억원)/, /\d+\s*년\s*(간\s*)?(보관|보존)/, /\d+\s*월\s*\d+\s*일/];
+/** 독자가 그 자리에서 다시 확인할 수 있는 출처(법령 원문·국세청) */
+const RECHECK_HOSTS = /(^|\.)(law\.go\.kr|nts\.go\.kr|hometax\.go\.kr)$/i;
 
 const DRIFT = /[\u3040-\u30ff\u4e00-\u9fff]/g;
 
@@ -115,6 +127,29 @@ for (const f of files) {
       // 본문뿐 아니라 frontmatter(summary 는 목록 카드에 그대로 노출)도 함께 봅니다.
       const m = re.exec(f.text);
       if (m) problems.push(`${rel}: 검증 대기 문서에 ${why}("…${m[0]}…") 가 있습니다`);
+    }
+  } else {
+    // pending → verified 로 값만 바꾸면 수치 금지가 전부 풀립니다. 그래서 검증 완료 문서에는
+    // 그 수치를 그 자리에서 다시 확인할 수 있는 출처를 요구합니다(법령 원문·국세청·홈택스).
+    const figures = LEGAL_FIGURE.map((re) => {
+      const m = re.exec(f.text);
+      return m ? m[0] : '';
+    }).filter((s) => s !== '');
+    const hosts = sourceUrls.map((u) => {
+      try {
+        return new URL(u).hostname;
+      } catch {
+        return '';
+      }
+    });
+    const recheckable = hosts.some((h) => RECHECK_HOSTS.test(h));
+    if (figures.length > 0 && !recheckable) {
+      problems.push(
+        `${rel}: 검증 완료 문서에 수치·조항(${figures.join(', ')})이 있는데 다시 확인할 수 있는 출처(law.go.kr·nts.go.kr·hometax.go.kr)가 없습니다 — 확인한 원문 링크를 sources 에 넣으세요`
+      );
+    }
+    if (/제\s?\d+조/.test(f.text) && !hosts.some((h) => /(^|\.)law\.go\.kr$/i.test(h))) {
+      problems.push(`${rel}: 조항(제N조)을 적으면서 국가법령정보센터 원문 링크가 없습니다 — 인용한 법령 링크를 sources 에 넣으세요`);
     }
   }
 
@@ -175,6 +210,10 @@ for (const block of ITEM_BLOCKS) {
   const verified = /verification:\s*'verified'/.test(block);
   const due = /dueText:\s*(null|'([^']*)')/.exec(block);
   if (!due) problems.push(`schedule.ts ${id}: dueText 칸이 없습니다(null 을 적어도 기입하세요)`);
+  // 필드를 아예 빼먹으면 pending 으로 해석되어 아래 검사에 걸리지만, 왜 막혔는지 메시지가 애매하므로 먼저 잡습니다.
+  if (!/verification:\s*'(verified|pending)'/.test(block)) {
+    problems.push(`schedule.ts ${id}: verification 칸이 없습니다 — 값을 확인해 'verified' 또는 'pending' 으로 명시하세요`);
+  }
   if (!verified) {
     if (due && due[1] !== 'null') problems.push(`schedule.ts ${id}: 검증 대기 항목의 시점이 채워져 있습니다 → ${due[2]}`);
     for (const { re, why } of FORBIDDEN_WHILE_PENDING) {
@@ -210,6 +249,26 @@ for (const block of ITEM_BLOCKS) {
     }
   }
   if (!/decidedBy:\s*'[^']+/.test(block)) problems.push(`schedule.ts ${id}: 값이 어디서 확정되는지(decidedBy)가 비어 있습니다`);
+  if (verified) {
+    // pending → verified 로 바꾸면 수치 금지가 풀립니다. 채워진 시점은 그 자리에서 재확인 가능한
+    // 법령·국세청 링크와 조문 인용을 같은 항목에서 요구합니다.
+    const hosts = urls.map((u) => {
+      try {
+        return new URL(u).hostname;
+      } catch {
+        return '';
+      }
+    });
+    const dueHasFigure = /dueText:\s*'[^']*\d/.test(block);
+    const citesLaw = /제\s?\d+조/.test(block);
+    const selfOnly = refs.length > 0 && refs.every((r) => (SOURCE_CONSTS.get(r)?.url ?? '').includes(SELF_HOST));
+    if (dueHasFigure && !hosts.some((h) => RECHECK_HOSTS.test(h)))
+      problems.push(`schedule.ts ${id}: 검증 완료 시점(${due && due[2] ? due[2] : ''})에 수치가 있는데 확인 창구에 법령·국세청·홈택스 링크가 없습니다 — 확인한 원문 링크를 sources 에 넣으세요`);
+    if (citesLaw && !hosts.some((h) => /(^|\.)law\.go\.kr$/i.test(h)))
+      problems.push(`schedule.ts ${id}: 조문(제N조)을 적으면서 그 항목의 확인 창구에 국가법령정보센터 링크가 없습니다`);
+    if (selfOnly && !/자체|권장/.test(block))
+      problems.push(`schedule.ts ${id}: 이 사이트 링크만 걸어 두고 자체 권장임을 적지 않았습니다 — 기관 요구로 읽힐 수 있습니다`);
+  }
 }
 if (problems.length) {
   console.error('콘텐츠 검사 실패:\n' + problems.map((p) => '  - ' + p).join('\n'));
