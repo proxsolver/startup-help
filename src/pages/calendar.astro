@@ -20,20 +20,23 @@ const pending = pendingCount();
 
   <aside class="notice">
     <strong>현재 {pending}개 항목의 시점이 비어 있습니다</strong>
-    사업비 제출 기한, 전용 카드 사용 요구, 인정·불인정 범위, 서류 보존 기간은 사업 공고와 담당 주관기관 지침 기준입니다.
-    1차 출처 검증이 끝나는 대로 채우고, 검증 전에는 추정치를 올리지 않습니다. 급한 마감은 담당 기관 공지와
+    사업비 제출 기한, 전용 카드 사용 요구, 인정·불인정 범위, 서류 보존 기간은 사업 공고·협약서·담당 주관기관 지침(및 세법) 기준입니다.
+    1차 출처 검증이 끝나는 대로 채우고, 검증 전에는 추정치를 올리지 않습니다.
+    <strong>값이 확정되는 자리</strong> 열이 그 항목을 어디서 확인해야 하는지(협약서·공지·원문)를 먼저 알려주고,
+    <strong>확인</strong> 열의 링크가 그 원문으로 갑니다. 급한 마감은 담당 기관 공지와
     <a href="https://modoo.or.kr" rel="noopener noreferrer external" target="_blank">모두의 창업</a> 안내에서 확인하세요.
   </aside>
 
   <div class="table-scroll">
     <table>
-      <caption class="small muted" style="text-align:left">항목별 해당 단계와 확인 창구</caption>
+      <caption class="small muted" style="text-align:left">항목별 시점 · 확정되는 자리 · 확인 창구</caption>
       <thead>
         <tr>
           <th scope="col">항목</th>
           <th scope="col">시점</th>
           <th scope="col">단계</th>
           <th scope="col">설명</th>
+          <th scope="col">값이 확정되는 자리</th>
           <th scope="col">확인</th>
         </tr>
       </thead>
@@ -53,8 +56,16 @@ const pending = pendingCount();
                 {e.appliesTo.map((a) => <span class="badge">{AUDIENCE_LABEL[a] ?? a}</span>)}
               </td>
               <td class="small">{e.detail}</td>
-              <td>
-                <a href={e.source.url} rel="noopener noreferrer external" target="_blank">{e.source.label}</a>
+              <td class="small">{e.decidedBy}</td>
+              <td class="small">
+                {e.sources.map((s, i) => (
+                  <>
+                    {i > 0 && ' · '}
+                    <a href={s.url} rel="noopener noreferrer external" target="_blank">
+                      {s.label}
+                    </a>
+                  </>
+                ))}
               </td>
             </tr>
           ))

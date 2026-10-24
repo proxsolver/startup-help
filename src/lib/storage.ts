@@ -1,10 +1,19 @@
 /**
  * 브라우저 localStorage 전용 저장 계층.
  * 이 사이트는 서버에 사용자 데이터를 보내지 않습니다. 저장소는 오직 window.localStorage 입니다.
+ *
+ * 여러 탭이 같은 저장소를 쓰는 경우를 전제로 다음 규칙을 지킵니다.
+ * - 쓰기 직전 저장된 값을 다시 읽어(읽기-수정-쓰기) 항목 단위로 합칩니다 → 다른 탭의 입력이 사라지지 않습니다.
+ * - 삭제한 id 는 저장소의 removed 목록에 남깁니다 → 오래된 화면을 가진 탭이 지운 행을 되살리지 못합니다.
+ * - 저장된 데이터가 이 코드보다 새로운 스키마면 쓰기를 거부하고 화면에 알립니다 → 되돌릴 수 없는 강등 방지.
+ * - 지울 수 없는 행이 있으면 개수를 그대로 드러냅니다 → 조용히 사라지는 데이터 없음.
  */
 import { SCHEMA_VERSION, sanitizeEntries, type ReceiptEntry } from './receipts';
 
 export const STORAGE_KEY = 'startup-help/state/v1';
+
+/** tombstone 목록 상한. 오래된 id 부터 버립니다(지운 개수만큼 자라 파일이 무거워지지 않도록). */
+export const MAX_TOMBSTONES = 500;
 
 export interface ChecklistState {
   [itemId: string]: boolean;
@@ -14,6 +23,8 @@ export interface AppState {
   schemaVersion: number;
   entries: ReceiptEntry[];
   checklist: ChecklistState;
+  /** 이 저장소에서 삭제된 항목 id. 다른 탭이 같은 id 를 다시 보내도 되살아나지 않습니다. */
+  removed: string[];
   lastExportAt: string | null;
 }
 
@@ -22,8 +33,21 @@ export function emptyState(): AppState {
     schemaVersion: SCHEMA_VERSION,
     entries: [],
     checklist: {},
+    removed: [],
     lastExportAt: null
   };
+}
+
+/** tombstone 병합: 지난 id 를 먼저 두고 새 id 를 뒤에 붙입니다. 상한을 넘으면 오래된 id 부터 버립니다. */
+function joinRemoved(existing: readonly string[], adding: readonly string[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const id of existing.concat(adding)) {
+    if (typeof id !== 'string' || id === '' || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out.length > MAX_TOMBSTONES ? out.slice(out.length - MAX_TOMBSTONES) : out;
 }
 
 function safeParse(text: string | null): unknown {
@@ -35,15 +59,28 @@ function safeParse(text: string | null): unknown {
   }
 }
 
+/** 저장된 원문이 이 코드(SCHEMA_VERSION)보다 새로운 형식인지 봅니다. */
+export function isFutureSchema(raw: unknown): boolean {
+  if (typeof raw !== 'object' || raw === null) return false;
+  const v = (raw as Record<string, unknown>).schemaVersion;
+  return typeof v === 'number' && Number.isFinite(v) && v > SCHEMA_VERSION;
+}
+
 /**
- * 저장된 JSON 을 읽습니다. 알 수 없는 스키마 버전·깨진 데이터는 빈 상태로 되돌립니다.
- * 손실된 항목 수는 되살아나지 않으므로, 호출 화면에서 안내 문구를 띄웁니다.
+ * 저장된 JSON 을 읽습니다. 알 수 없는 형식은 빈 상태로, 읽지 못한 행은 개수로 돌려줍니다.
+ * v1 데이터(카드/현금 5종, category 필드)는 sanitizeEntries → normalizeEntry 에서
+ * v2(비목·전용카드·집행기간·수취/제출 상태)로 자동 승격됩니다.
  */
-export function normalizeState(raw: unknown): { state: AppState; dropped: number } {
-  if (typeof raw !== 'object' || raw === null) return { state: emptyState(), dropped: 0 };
+export function normalizeState(raw: unknown): { state: AppState; dropped: number; future: boolean } {
+  const future = isFutureSchema(raw);
+  if (typeof raw !== 'object' || raw === null) return { state: emptyState(), dropped: 0, future: false };
   const o = raw as Record<string, unknown>;
   const inputEntries = Array.isArray(o.entries) ? o.entries : [];
-  const entries = sanitizeEntries(inputEntries);
+  const entries0 = sanitizeEntries(inputEntries);
+  const removedRaw = Array.isArray(o.removed) ? (o.removed as unknown[]) : [];
+  const removed = joinRemoved([], removedRaw.filter((v): v is string => typeof v === 'string' && v !== ''));
+  const gone = new Set(removed);
+  const entries = entries0.filter((e) => !gone.has(e.id));
   const checklistRaw = typeof o.checklist === 'object' && o.checklist !== null ? (o.checklist as Record<string, unknown>) : {};
   const checklist: ChecklistState = {};
   for (const [k, v] of Object.entries(checklistRaw)) {
@@ -51,24 +88,51 @@ export function normalizeState(raw: unknown): { state: AppState; dropped: number
   }
   return {
     state: {
-      // v1 데이터(카드/현금 5종, category 필드)는 sanitizeEntries → normalizeEntry 에서
-      // v2(비목·전용카드·집행기간·수취/제출 상태)로 자동 승격됩니다. 읽을 수 없는 행만 버립니다.
       schemaVersion: SCHEMA_VERSION,
       entries,
       checklist,
+      removed,
       lastExportAt: typeof o.lastExportAt === 'string' ? o.lastExportAt : null
     },
-    dropped: Math.max(0, inputEntries.length - entries.length)
+    dropped: Math.max(0, inputEntries.length - entries0.length),
+    future
   };
 }
 
-export function loadState(storage: Storage | undefined = getStorage()): AppState {
-  if (!storage) return emptyState();
-  return normalizeState(safeParse(storage.getItem(STORAGE_KEY))).state;
+export function readStored(storage: Storage | undefined = getStorage()): { state: AppState; dropped: number; future: boolean } {
+  if (!storage) return { state: emptyState(), dropped: 0, future: false };
+  return normalizeState(safeParse(storage.getItem(STORAGE_KEY)));
 }
 
+/** 지출 항목 합치기(읽기-수정-쓰기의 순수 부분). 단위 테스트 대상입니다.
+ * - 저장된 값은 그대로 두고, 이번 세션에서 보낸 entries 로 같은 id 를 덮어씁니다(방금 고친 값이 승리).
+ * - removed 에 적힌 id 는 양쪽에서 지웁니다(다른 탭에서 삭제한 항목이 되살아나지 않습니다).
+ * - 이번 화면이 모르는 id(다른 탭이 방금 추가한 항목)는 보존합니다.
+ */
+export function mergeEntries(stored: readonly ReceiptEntry[], local: readonly ReceiptEntry[], removed: readonly string[] = []): ReceiptEntry[] {
+  const gone = new Set(removed);
+  const byId = new Map<string, ReceiptEntry>();
+  for (const e of stored) if (!gone.has(e.id)) byId.set(e.id, e);
+  for (const e of local) {
+    if (gone.has(e.id)) byId.delete(e.id);
+    else byId.set(e.id, e);
+  }
+  return [...byId.values()].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+}
+
+export function loadState(storage: Storage | undefined = getStorage()): AppState {
+  return readStored(storage).state;
+}
+
+/** 화면용. 드롭 행과 미래 버전 여부를 함께 알려줍니다. */
+export function loadStateDetailed(storage: Storage | undefined = getStorage()): { state: AppState; dropped: number; future: boolean } {
+  return readStored(storage);
+}
+
+/** 저장합니다. 단, 저장된 데이터가 더 새로운 스키마이면 쓰지 않습니다. */
 export function saveState(state: AppState, storage: Storage | undefined = getStorage()): boolean {
   if (!storage) return false;
+  if (isFutureSchema(safeParse(storage.getItem(STORAGE_KEY)))) return false;
   try {
     storage.setItem(STORAGE_KEY, JSON.stringify({ ...state, schemaVersion: SCHEMA_VERSION }));
     return true;
@@ -78,6 +142,60 @@ export function saveState(state: AppState, storage: Storage | undefined = getSto
   }
 }
 
+/**
+ * 지출 항목만 저장합니다. 다른 탭이 체크리스트를 방금 건졌다면 그 값은 보존되고,
+ * 다른 탭이 추가한 행은 합쳐집니다. 삭제 기록(removed)은 저장소에 누적되므로
+ * 오래된 화면을 든 탭이 지운 행을 다시 보내도 되살아나지 않습니다.
+ */
+export function saveEntries(
+  entries: readonly ReceiptEntry[],
+  removedIds: readonly string[] = [],
+  storage: Storage | undefined = getStorage()
+): { ok: boolean; merged: ReceiptEntry[]; removed: string[]; future: boolean } {
+  if (!storage) return { ok: false, merged: entries.slice(), removed: removedIds.slice(), future: false };
+  const stored = readStored(storage);
+  if (stored.future) return { ok: false, merged: stored.state.entries, removed: stored.state.removed, future: true };
+  const removed = joinRemoved(stored.state.removed, removedIds);
+  const merged = mergeEntries(stored.state.entries, entries, removed);
+  const next: AppState = { ...stored.state, entries: merged, removed, schemaVersion: SCHEMA_VERSION };
+  const ok = saveState(next, storage);
+  return { ok, merged: ok ? merged : entries.slice(), removed: ok ? removed : removedIds.slice(), future: false };
+}
+
+/** 제출·내보내기 시각 같은 메타만 갱신합니다. */
+export function saveMeta(patch: { lastExportAt?: string | null }, storage: Storage | undefined = getStorage()): boolean {
+  if (!storage) return false;
+  const stored = readStored(storage);
+  if (stored.future) return false;
+  const next: AppState = {
+    ...stored.state,
+    lastExportAt: 'lastExportAt' in patch ? (patch.lastExportAt ?? null) : stored.state.lastExportAt
+  };
+  return saveState(next, storage);
+}
+
+/**
+ * 체크리스트만 저장합니다. 지출 항목은 저장된 값을 그대로 두므로,
+ * 다른 탭에서 정리 도구를 쓰다가 이 화면에서 체크하나 켜도 입력이 사라지지 않습니다.
+ * 여러 탭의 체크 결과는 합칩니다(저장된 값 + 이번 값).
+ */
+export function saveChecklist(checklist: ChecklistState, storage: Storage | undefined = getStorage()): boolean {
+  if (!storage) return false;
+  const stored = readStored(storage);
+  if (stored.future) return false;
+  return saveState({ ...stored.state, checklist: { ...stored.state.checklist, ...checklist } }, storage);
+}
+
+/** 지출 목록만 비웁니다(체크리스트는 남깁니다). 지금 있던 id 는 삭제 기록으로 남깁니다. */
+export function clearEntries(storage: Storage | undefined = getStorage()): { ok: boolean; removed: string[]; future: boolean } {
+  if (!storage) return { ok: false, removed: [], future: false };
+  const stored = readStored(storage);
+  if (stored.future) return { ok: false, removed: stored.state.removed, future: true };
+  const removed = joinRemoved(stored.state.removed, stored.state.entries.map((e) => e.id));
+  return { ok: saveState({ ...stored.state, entries: [], removed }, storage), removed, future: false };
+}
+
+/** 이 브라우저의 이 사이트 데이터를 전부 삭제합니다(체크리스트 포함). */
 export function clearState(storage: Storage | undefined = getStorage()): void {
   if (!storage) return;
   storage.removeItem(STORAGE_KEY);
@@ -104,6 +222,17 @@ export function serializeState(state: AppState): string {
   return JSON.stringify({ ...state, schemaVersion: SCHEMA_VERSION }, null, 2);
 }
 
-export function parseBackup(text: string): { state: AppState; dropped: number } {
+export function parseBackup(text: string): { state: AppState; dropped: number; future: boolean } {
   return normalizeState(safeParse(text));
+}
+
+/**
+ * 백업 복원용. 목록 전체를 **대체**합니다(saveEntries 와 달리 id 병합 없음 — 복원은 대체라는 약속).
+ * 체크리스트는 저장된 값을 보존하고, 삭제 기록은 비웁니다(복원 파일의 행이 지난 삭제에 지워지면 안 됩니다).
+ */
+export function replaceEntries(entries: readonly ReceiptEntry[], storage: Storage | undefined = getStorage()): { ok: boolean; future: boolean } {
+  if (!storage) return { ok: false, future: false };
+  const stored = readStored(storage);
+  if (stored.future) return { ok: false, future: true };
+  return { ok: saveState({ ...stored.state, entries: entries.slice(), removed: [] }, storage), future: false };
 }

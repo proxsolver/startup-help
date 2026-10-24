@@ -11,7 +11,22 @@ interface Props {
   path?: string;
 }
 
-const { title, path = '' } = Astro.props;
+const SITE_NAME = '모두의 창업 정산 도우미';
+const NON_OFFICIAL = `${SITE_NAME} (비공식)`;
+
+/**
+ * 모든 화면의 제목·og 에 "(비공식)" 을 붙입니다.
+ * 공유된 링크가 열릴 때 공식 기관 페이지로 오해되는 것을 막는 것이 목적이라
+ * 본문 배너만으로는 부족합니다(브라우저 탭·미리보기 카드에 남지 않으므로).
+ */
+function fullTitle(raw: string): string {
+  const cleaned = raw.replace(/\s*[—·]\s*모두의 창업 정산 도우미.*$/, '').replace(/\s*\(비공식\)\s*$/, '').trim();
+  if (!cleaned || cleaned === SITE_NAME) return NON_OFFICIAL;
+  return `${cleaned} · ${NON_OFFICIAL}`;
+}
+
+const { path = '' } = Astro.props;
+const docTitle = fullTitle(Astro.props.title);
 const description =
   Astro.props.description ??
   '지원사업 참여자의 사업비 집행·지출증빙·정산 보고를 정리하는 비공식 안내와 브라우저 전용 도구. 입력 내용은 서버로 전송되지 않습니다.';
@@ -23,17 +38,20 @@ const canonical = absoluteUrl(Astro.site, path || Astro.url.pathname);
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{title}</title>
+    <title>{docTitle}</title>
     <meta name="description" content={description} />
     <meta name="theme-color" content="#1d5fd0" />
     <meta name="color-scheme" content="light dark" />
     {canonical && <link rel="canonical" href={canonical} />}
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="ko_KR" />
-    <meta property="og:title" content={title} />
+    <meta property="og:site_name" content={NON_OFFICIAL} />
+    <meta property="og:title" content={docTitle} />
     <meta property="og:description" content={description} />
     {canonical && <meta property="og:url" content={canonical} />}
     <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content={docTitle} />
+    <meta name="twitter:description" content={description} />
     <link rel="icon" href={p('/favicon.svg')} />
     <meta name="robots" content="index, follow" />
   </head>

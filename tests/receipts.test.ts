@@ -6,6 +6,7 @@ import {
   computeTotals,
   csvFileName,
   evidenceGapList,
+  exportPeriod,
   filterEntries,
   formatKRW,
   migrateLegacyEntry,
@@ -311,5 +312,92 @@ describe('표기 헬퍼', () => {
   it('csvFileName 은 기간·날짜를 포함', () => {
     expect(csvFileName('2026-03')).toMatch(/^execution_202603_\d{8}\.csv$/);
     expect(csvFileName('')).toMatch(/^execution_all_\d{8}\.csv$/);
+  });
+
+  it('csvFileName 은 기간 문자를 파일 이름에 안전한 형태로 바꾼다', () => {
+    const now = new Date('2026-03-31T12:00:00Z');
+    expect(csvFileName('2026-01-01~2026-01-31', now)).toBe('execution_20260101~20260131_20260331.csv');
+    expect(csvFileName('from-2026-02-05', now)).toBe('execution_from20260205_20260331.csv');
+    // 경로 구분자·점·한글은 파일 이름을 망가뜨리지 못합니다.
+    expect(csvFileName('../../암/기', now)).toBe('execution_all_20260331.csv');
+    expect(csvFileName('  ', now)).toBe('execution_all_20260331.csv');
+    expect(csvFileName('../x', now)).toBe('execution_x_20260331.csv');
+  });
+});
+
+describe('exportPeriod (필터 기간을 파일 이름으로)', () => {
+  const now = new Date('2026-03-31T00:00:00Z');
+  it('필터가 없으면 현재 월', () => {
+    expect(exportPeriod({}, now)).toBe('2026-03');
+  });
+  it('시작·종료일이 둘 다 있으면 범위', () => {
+    expect(exportPeriod({ from: '2026-01-01', to: '2026-01-31' }, now)).toBe('2026-01-01~2026-01-31');
+  });
+  it('한쪽만 있으면 그쪽만 적는다', () => {
+    expect(exportPeriod({ from: '2026-02-05' }, now)).toBe('from-2026-02-05');
+    expect(exportPeriod({ to: '2026-02-05' }, now)).toBe('to-2026-02-05');
+  });
+  it('다른 필터 값은 파일 이름에 영향을 주지 않는다', () => {
+    expect(exportPeriod({ budgetItem: '재료비', q: '택' }, now)).toBe('2026-03');
+  });
+});
+
+describe('마이그레이션 견고성 (리뷰 지적 재현)', () => {
+  const v1 = (over: Record<string, unknown> = {}) => ({
+    id: 'l1',
+    date: '2026-03-05',
+    vendor: '원단상사',
+    amount: 42000,
+    payMethod: '카드',
+    evidenceType: '신용카드매출전표',
+    regularEvidence: true,
+    category: '매입·원재료',
+    memo: 'v1 데이터',
+    ...over
+  });
+
+  it('두 번 지나가도 결과가 같다(멱등)', () => {
+    const once = migrateLegacyEntry(v1());
+    const twice = migrateLegacyEntry(structuredClone(once));
+    expect(twice).toEqual(once);
+    const e1 = normalizeEntry(v1());
+    const e2 = normalizeEntry(JSON.parse(JSON.stringify(e1)));
+    expect(e2).toEqual(e1);
+  });
+
+  it('v1 신호와 v2 값이 섞여 있어도 이미 채워진 v2 필드는 살려 둔다', () => {
+    const mixed = normalizeEntry(
+      v1({
+        payMethod: '전용(체크)카드',
+        budgetItem: '시제품 제작',
+        periodState: '기간 내',
+        submitState: '제출 완료',
+        evidenceState: '사본·이미지만'
+      })
+    );
+    expect(mixed!.payMethod).toBe('전용(체크)카드');
+    expect(mixed!.budgetItem).toBe('시제품 제작');
+    expect(mixed!.periodState).toBe('기간 내');
+    expect(mixed!.submitState).toBe('제출 완료');
+    expect(mixed!.evidenceState).toBe('사본·이미지만');
+  });
+
+  it('category 가 비어 있으면 budgetItem 은 기타로 간다', () => {
+    expect(normalizeEntry(v1({ category: '   ' }))!.budgetItem).toBe('기타');
+    expect(normalizeEntry(v1({ category: '' }))!.budgetItem).toBe('기타');
+  });
+
+  it('__proto__ 같은 키가 들어와도 프로토타입을 건드리지 않는다', () => {
+    const bad = normalizeEntry({ date: '2026-03-05', amount: 10, payMethod: '__proto__', category: '재료비' });
+    expect(bad!.payMethod).toBe('확인 필요');
+    expect(({} as Record<string, unknown>).payMethod).toBeUndefined();
+    expect(({} as Record<string, unknown>).evidenceState).toBeUndefined();
+  });
+
+  it('v2 만의 값(현금·계좌이체 등)은 옛 매핑에 묶여도 그대로 통과', () => {
+    for (const pay of ['현금', '계좌이체', '간편결제', '기타', '사업자·법인카드', '개인카드', '확인 필요']) {
+      const e = normalizeEntry({ date: '2026-03-05', amount: 10, payMethod: pay });
+      expect(e!.payMethod).toBe(pay);
+    }
   });
 });

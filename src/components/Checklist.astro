@@ -73,7 +73,7 @@ const totalItems = stages.reduce((n, s) => n + s.items.length, 0);
 </div>
 
 <script>
-  import { loadState, saveState } from '../lib/storage';
+  import { loadState, saveChecklist, STORAGE_KEY } from '../lib/storage';
 
   const root = document.querySelector('[data-checklist]');
   if (root instanceof HTMLElement) {
@@ -83,7 +83,9 @@ const totalItems = stages.reduce((n, s) => n + s.items.length, 0);
     const overallBar = root.querySelector<HTMLElement>('[data-overall-bar]');
     const overallText = root.querySelector<HTMLElement>('[data-overall-text]');
 
-    const state = loadState();
+    // 여기서 건드리는 것은 checklist 뿐입니다. entries 는 저장된 값을 그대로 둡니다
+    // (지출 정리 도구를 다른 탭에서 쓰는 중인데 이 화면이 목록을 덮어쓰는 사고 방지).
+    const checklist = loadState().checklist;
 
     function refresh() {
       let done = 0;
@@ -111,14 +113,25 @@ const totalItems = stages.reduce((n, s) => n + s.items.length, 0);
     }
 
     for (const box of boxes) {
-      box.checked = state.checklist[box.dataset.id ?? ''] === true;
+      box.checked = checklist[box.dataset.id ?? ''] === true;
       box.addEventListener('change', () => {
-        state.checklist[box.dataset.id ?? ''] = box.checked;
-        const ok = saveState(state);
+        checklist[box.dataset.id ?? ''] = box.checked;
+        const ok = saveChecklist({ [box.dataset.id ?? '']: box.checked });
         if (warning) warning.hidden = ok;
         refresh();
       });
     }
     refresh();
+
+    // 다른 탭에서 지출을 정리해도 이 화면의 체크는 다시 읽어 맞춥니다.
+    window.addEventListener('storage', (event) => {
+      if (event.key !== null && event.key !== STORAGE_KEY) return;
+      const fresh = loadState().checklist;
+      for (const box of boxes) {
+        const want = fresh[box.dataset.id ?? ''] === true;
+        if (box.checked !== want && document.activeElement !== box) box.checked = want;
+      }
+      refresh();
+    });
   }
 </script>

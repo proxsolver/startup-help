@@ -1,11 +1,17 @@
 // @ts-check
 /**
  * 콘텐츠 게이트. 게시 전에 아래를 검사하고 하나라도 걸리면 실패시킵니다.
- *   1) 모든 문서에 공식 출처 링크(sources)가 1개 이상 있다
- *   2) verification: pending 인 문서에 검증 메모가 있다
- *   3) pending 문서가 법적 수치·제재 표현(만원/억원/가산세/제N조/N년 보존)을 본문에 쓰지 않았다
+ *   1) 모든 문서에 공식 출처 링크(sources)가 1개 이상 있다 (도메인은 공공 기관 영역으로 제한)
+ *   2) verification: pending 인 문서에 검증 메모가 있다 — 기본값이 pending 이므로 verification 을
+ *      아예 적지 않으면 pending 으로 취급되어 메모 요구·수치 금지가 함께 걸립니다
+ *   3) pending 문서가 법적 수치·제재 표현(만원/억원/가산세/제N조/N년 보존/기한 수치)을 쓰지 않았다
+ *      (본문뿐 아니라 frontmatter 도 함께 봅니다)
  *   4) 문서 안의 내부 링크(/guide/..., /tools/... 등)가 실제 라우트로 존재한다
  *   5) 본문에 한자·가나 섞임(drift)이 없다 — 한국어 사이트에서 섞이는 사고를 빌드에서 잡는다
+ *   6) 컴포넌트·데이터 코드에 적힌 링크도 실제 라우트인지 검사한다(주석 속 예시는 제외)
+ *   7) 화면에 찍히는 게시 데이터(src/data/schedule.ts)도 같은 규칙을 따른다 — pending 항목은
+ *      시점 칸을 채울 수 없고, 설명에 검증 안 된 수치를 쓰지 못하며, 확인 창구 링크와
+ *      '값이 확정되는 자리(decidedBy)' 를 반드시 갖는다
  *
  * 사용: node scripts/check-content.mjs   (npm run check:content)
  */
@@ -29,7 +35,10 @@ const STATIC_ROUTES = [
   '/404/'
 ];
 
-/** @returns {{path:string, text:string, fm:string, body:string}[]} */
+/**
+ * @param {string} dir
+ * @returns {{path:string, text:string, fm:string, body:string}[]}
+ */
 function collect(dir) {
   const out = [];
   for (const name of readdirSync(dir)) {
@@ -49,31 +58,62 @@ const ids = files.map((f) => {
   const rel = f.path.slice(CONTENT.length + 1).replace(/\\/g, '/').replace(/\.md$/, '');
   return '/guide/' + rel + '/';
 });
-const known = new Set([...STATIC_ROUTES, ...ids]);
+
+// 분류 목록 페이지(/guide/<category>/) 도 실제 라우트입니다.
+// 라우트는 src/pages/guide/[category]/index.astro 의 getStaticPaths(CATEGORY_META) 에서 나오므로,
+// 그 키를 데이터 파일에서 읽어 함께 등록합니다. (문서가 없는 분류도 라우트는 존재한다)
+const categoriesSource = readFileSync(join(ROOT, 'src', 'data', 'categories.ts'), 'utf8');
+const categoryKeys = new Set([...categoriesSource.matchAll(/key:\s*'([a-z_]+)'/g)].map((m) => m[1]));
+for (const f of files) {
+  const m = /^category:\s*'?([a-z_]+)'?/m.exec(f.fm);
+  if (m) categoryKeys.add(m[1]);
+}
+const categoryRoutes = [...categoryKeys].map((c) => `/guide/${c}/`);
+
+const known = new Set([...STATIC_ROUTES, ...ids, ...categoryRoutes]);
 
 const FORBIDDEN_WHILE_PENDING = [
-  { re: /\d+\s*만원/, why: '금액 한도' },
-  { re: /\d+\s*억원/, why: '금액 기준' },
+  { re: /\d[\d,]*\s*원\b/, why: '원 단위 금액' },
+  { re: /\d\s*만원/, why: '금액 한도' },
+  { re: /\d\s*억원/, why: '금액 기준' },
+  { re: /[일이삼사오육칠팔구십]+만원/, why: '한글 수량 금액' },
   { re: /가산세/, why: '제재 표현' },
   { re: /제\s?\d+조/, why: '법령 조항 인용' },
-  { re: /\d+\s*년\s*(간\s*)?보존|보존기간\s*(은|이)?\s*\d/, why: '보존기간 수치' },
-  { re: /기한은\s*\d+/, why: '기한 수치' }
+  { re: /\d+\s*년\s*(간\s*)?보존|보존기간\s*(은|이)?\s*\d|\d+\s*년간\s*(보관|보존)/, why: '보존기간 수치' },
+  { re: /기한은\s*\d+|\d+\s*(일|개월)\s*(이내|안에|까지)/, why: '기한 수치' }
 ];
 
 const DRIFT = /[\u3040-\u30ff\u4e00-\u9fff]/g;
 
+/** @type {string[]} */
 const problems = [];
 for (const f of files) {
   const rel = posix.relative(join(ROOT, 'src'), f.path);
   const hasSources = /sources:\s*\n(?:\s*-\s+label:.*\n\s*url:\s*'?\S+'?\n)/.test(f.fm) || /url:\s*['"]https?:\/\//.test(f.fm);
   if (!hasSources) problems.push(`${rel}: 공식 출처(sources)가 없습니다`);
+  // 출처로 적을 수 있는 도메인은 공공 기관 영역으로 제한합니다(블로그·기사 인용 방지).
+  const sourceUrls = [...f.fm.matchAll(/url:\s*['"]?(https?:\/\/[^\s'"]+)/g)].map((m) => m[1]);
+  for (const u of sourceUrls) {
+    let host = '';
+    try {
+      host = new URL(u).hostname;
+    } catch {
+      problems.push(`${rel}: 출처 URL 형식이 올바르지 않습니다 → ${u}`);
+      continue;
+    }
+    if (!/(^|\.)(go\.kr|or\.kr|gov\.kr|law\.go\.kr)$/i.test(host)) {
+      problems.push(`${rel}: 출처 도메인이 공공 기관 영역이 아닙니다 → ${host}`);
+    }
+  }
 
-  const pending = /verification:\s*pending/.test(f.fm);
+  // 스키마 기본값이 'pending' 이므로 verified 라고 적힌 경우만 검증 완료로 봅니다(따옴표 허용).
+  const pending = !/verification:\s*['"]?verified['"]?/.test(f.fm);
   if (pending && !/verificationNote:/.test(f.fm)) problems.push(`${rel}: pending 인데 verificationNote 이 없습니다`);
 
   if (pending) {
     for (const { re, why } of FORBIDDEN_WHILE_PENDING) {
-      const m = re.exec(f.body);
+      // 본문뿐 아니라 frontmatter(summary 는 목록 카드에 그대로 노출)도 함께 봅니다.
+      const m = re.exec(f.text);
       if (m) problems.push(`${rel}: 검증 대기 문서에 ${why}("…${m[0]}…") 가 있습니다`);
     }
   }
@@ -95,11 +135,97 @@ if (problems.length) {
 }
 
 /**
+ * 6) 코드·데이터 파일에 적힌 내부 링크도 실제 라우트인지 검사합니다.
+ *    (문서 본문 밖의 링크 — checklists.ts 의 guide:, 컴포넌트의 href — 가 사라진 경로로 남는 사고 방지)
+ *    설명용 예시(주석 안의 경로)와 템플릿 리터럴로 id 를 조립하는 곳은 판정할 수 없어 건너뜁니다.
+ */
+const CODE_LINK = /["'`](\/(?:guide|tools|calendar|about|privacy|terms|disclaimer)\/[^"'`\n]*)["'`]/g;
+const COMMENT_LINE = /^\s*(?:\/\/|\/\*|\*|\{\/\*|<!--)/;
+const CODE_FILE = /\.(astro|ts|tsx|js|mjs)$/;
+for (const file of walkText(join(ROOT, 'src'))) {
+  if (!CODE_FILE.test(file)) continue;
+  const lines = readFileSync(file, 'utf8').split('\n');
+  const text = lines.map((l) => (COMMENT_LINE.test(l) ? '' : l)).join('\n');
+  for (const m of text.matchAll(CODE_LINK)) {
+    const href = m[1];
+    if (href.includes('${')) continue;
+    const norm = href.endsWith('/') ? href : href + '/';
+    if (!known.has(norm)) problems.push(`${posix.relative(ROOT, file)}: 존재하지 않는 내부 링크 ${href}`);
+  }
+}
+
+/**
+ * 7) 코드 안에 있는 게시 데이터도 같은 honesty 규칙을 따라야 합니다.
+ *    문서(md)만 검사하면 일정표(schedule.ts)의 기한·금액 칸이 무방비로 통과합니다.
+ *    pending 항목은 시점(dueText)을 채울 수 없고, 라벨·설명에 검증 안 된 수치도 못 씁니다.
+ */
+const SCHEDULE = readFileSync(join(ROOT, 'src', 'data', 'schedule.ts'), 'utf8');
+// 링크는 const 로 묶어 재사용하므로 상수를 먼저 풀어 읽습니다.
+const SOURCE_CONSTS = new Map();
+for (const m of SCHEDULE.matchAll(/const ([A-Z_]+): ScheduleSource = \{([^}]*)\}/g)) {
+  const label = /label:\s*'([^']*)'/.exec(m[2])?.[1] ?? '';
+  const url = /url:\s*'([^']*)'/.exec(m[2])?.[1] ?? '';
+  SOURCE_CONSTS.set(m[1], { label, url });
+}
+const ITEM_BLOCKS = SCHEDULE.match(/\n  \{\n[\s\S]*?\n  \}/g) ?? [];
+if (ITEM_BLOCKS.length === 0) problems.push('src/data/schedule.ts: 항목을 찾지 못했습니다(검사 규칙과 데이터 형식이 어긋남)');
+const SELF_HOST = 'proxsolver.github.io';
+for (const block of ITEM_BLOCKS) {
+  const id = /id:\s*'([^']+)'/.exec(block)?.[1] ?? '(알 수 없음)';
+  const verified = /verification:\s*'verified'/.test(block);
+  const due = /dueText:\s*(null|'([^']*)')/.exec(block);
+  if (!due) problems.push(`schedule.ts ${id}: dueText 칸이 없습니다(null 을 적어도 기입하세요)`);
+  if (!verified) {
+    if (due && due[1] !== 'null') problems.push(`schedule.ts ${id}: 검증 대기 항목의 시점이 채워져 있습니다 → ${due[2]}`);
+    for (const { re, why } of FORBIDDEN_WHILE_PENDING) {
+      const m = re.exec(block);
+      if (m) problems.push(`schedule.ts ${id}: 검증 대기 항목에 ${why}("…${m[0]}…") 가 있습니다`);
+    }
+  }
+  const refs = (/\n\s+sources:\s*\[([^\]]*)\]/.exec(block)?.[1] ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const urls = [];
+  for (const ref of refs) {
+    const hit = SOURCE_CONSTS.get(ref);
+    if (!hit) {
+      problems.push(`schedule.ts ${id}: sources 의 '${ref}' 가 파일 안에 없습니다(상수 이름 확인)`);
+      continue;
+    }
+    urls.push(hit.url);
+    if (!hit.label) problems.push(`schedule.ts ${id}: 확인 창구 '${ref}' 에 표시할 이름이 없습니다`);
+  }
+  if (urls.length === 0) problems.push(`schedule.ts ${id}: 확인 창구 링크(sources)가 없습니다`);
+  for (const u of urls) {
+    let host = '';
+    try {
+      host = new URL(u).hostname;
+    } catch {
+      problems.push(`schedule.ts ${id}: 링크 형식 오류 → ${u}`);
+      continue;
+    }
+    if (host !== SELF_HOST && !/(^|\.)(go\.kr|or\.kr|gov\.kr)$/i.test(host)) {
+      problems.push(`schedule.ts ${id}: 공공 기관 영역이 아닌 링크 → ${host}`);
+    }
+  }
+  if (!/decidedBy:\s*'[^']+/.test(block)) problems.push(`schedule.ts ${id}: 값이 어디서 확정되는지(decidedBy)가 비어 있습니다`);
+}
+if (problems.length) {
+  console.error('콘텐츠 검사 실패:\n' + problems.map((p) => '  - ' + p).join('\n'));
+  process.exit(1);
+}
+
+/**
  * 문서뿐 아니라 컴포넌트·테스트·설정에서도 한자/가나 섞임을 잡는다.
  * (한국어 사이트 작성 중 모델·편집 실수로 섞여 들어가는 사고를 CI에서 영구 차단)
  */
 const DRIFT_TARGETS = ['src', 'tests', 'scripts', 'public', '.github'];
 const DRIFT_FILES = [README];
+/**
+ * @param {string} dir
+ * @returns {Generator<string>}
+ */
 function* walkText(dir) {
   for (const name of readdirSync(dir)) {
     if (name === 'node_modules' || name === 'dist' || name === '.astro') continue;
@@ -108,6 +234,7 @@ function* walkText(dir) {
     else if (/\.(astro|ts|js|mjs|md|yml|yaml|css|json|svg)$/.test(name)) yield p;
   }
 }
+/** @type {string[]} */
 const driftProblems = [];
 for (const dir of DRIFT_TARGETS) {
   const abs = join(ROOT, dir);

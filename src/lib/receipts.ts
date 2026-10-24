@@ -109,29 +109,40 @@ function oneOf<T extends readonly string[]>(value: unknown, list: T, fallback: T
   return list.includes(value as T[number]) ? (value as T[number]) : fallback;
 }
 
+const isPayMethod = (v: unknown) => (PAY_METHODS as readonly string[]).includes(v as string);
+
 /**
  * v1 항목(카드/현금 5종 + 정규증빙 구분 + 카테고리)을 v2 형태로 끌어올립니다.
  *
- * v1 과 v2 가 같은 단어로 쓰는 결제경로(현금·계좌이체·간편결제·기타)가 있으므로,
- * '카드' 라는 옛 값이나 v1 전용 필드(category·regularEvidence)가 보일 때만 승격합니다.
- * v2 필드가 이미 있으면 건드리지 않아, 같은 항목을 여러 번 지나가도 결과가 바뀌지 않습니다.
+ * 규칙:
+ * - v1 신호는 '카드' 값, `category` 필드, `regularEvidence` 키가 있을 때만 인정합니다
+ *   (현금·계좌이체·간편결제·기타 는 v1과 v2가 같은 단어를 씁니다).
+ * - **이미 채워진 v2 필드는 절대 덮어쓰지 않습니다.** 옛 백업 파일을 v2 화면에서 다시
+ *   내보낸 뒤 복원하는 것처럼 두 체계가 섞인 항목이 들어와도 전용카드·집행기간·제출상태가
+ *   사라지지 않습니다.
+ * - 같은 항목을 여러 번 지나가도 결과가 같은 그대로입니다(멱등).
  */
 export function migrateLegacyEntry(raw: Record<string, unknown>): Record<string, unknown> {
   const pay = typeof raw.payMethod === 'string' ? raw.payMethod : '';
-  const hasV1Shape = pay === '카드' || typeof raw.category === 'string' || 'regularEvidence' in raw;
+  const hasV1Shape = pay === '카드' || typeof raw.category === 'string' || Object.hasOwn(raw, 'regularEvidence');
   if (!hasV1Shape) return raw;
+
+  const out: Record<string, unknown> = { ...raw };
+  const filled = (key: string) => typeof raw[key] === 'string' && (raw[key] as string).trim() !== '';
+
+  if (!filled('budgetItem')) {
+    out.budgetItem = typeof raw.category === 'string' && raw.category ? raw.category : '기타';
+  }
+  if (!isPayMethod(pay)) {
+    out.payMethod = Object.hasOwn(LEGACY_PAY_MAP, pay) ? LEGACY_PAY_MAP[pay] : '확인 필요';
+  }
   const evidence = typeof raw.evidenceType === 'string' ? raw.evidenceType : '없음';
-  const movedEvidence = evidence === '신용카드매출전표' ? '카드전표(매출전표)' : evidence === '기타영수증' ? '간이영수증' : evidence;
-  const keep = (key: string, fallback: string) => (typeof raw[key] === 'string' && raw[key] !== '' ? (raw[key] as string) : fallback);
-  return {
-    ...raw,
-    budgetItem: keep('budgetItem', typeof raw.category === 'string' && raw.category ? raw.category : '기타'),
-    payMethod: LEGACY_PAY_MAP[pay] ?? '확인 필요',
-    evidenceType: movedEvidence,
-    evidenceState: keep('evidenceState', evidence === '없음' ? '미수취' : '원본 확보'),
-    periodState: keep('periodState', '확인 필요'),
-    submitState: keep('submitState', '미제출')
-  };
+  out.evidenceType =
+    evidence === '신용카드매출전표' ? '카드전표(매출전표)' : evidence === '기타영수증' ? '간이영수증' : evidence;
+  if (!filled('evidenceState')) out.evidenceState = evidence === '없음' ? '미수취' : '원본 확보';
+  if (!filled('periodState')) out.periodState = '확인 필요';
+  if (!filled('submitState')) out.submitState = '미제출';
+  return out;
 }
 
 export function normalizeEntry(raw: unknown): ReceiptEntry | null {
@@ -317,9 +328,28 @@ export function toCsvFile(entries: ReceiptEntry[]): string {
   return CSV_BOM + toCsv(entries);
 }
 
-export function csvFileName(period: string): string {
-  const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  return `execution_${period.replace(/-/g, '') || 'all'}_${stamp}.csv`;
+/**
+ * CSV 파일 이름에 쓸 기간 표기.
+ * 화면의 필터(from/to)가 파일 이름에도 반영되어야, 받아둔 파일이 "언제 범위" 인지 붙입니다.
+ * 필터가 없으면 현재 월, 한쪽만 있으면 그쪽만 적습니다.
+ */
+export function exportPeriod(f: Filters = {}, now: Date = new Date()): string {
+  const from = typeof f.from === 'string' ? f.from.slice(0, 10) : '';
+  const to = typeof f.to === 'string' ? f.to.slice(0, 10) : '';
+  if (from && to) return `${from}~${to}`;
+  if (from) return `from-${from}`;
+  if (to) return `to-${to}`;
+  return currentPeriod(now);
+}
+
+export function csvFileName(period: string, now: Date = new Date()): string {
+  const stamp = now.toISOString().slice(0, 10).replace(/-/g, '');
+  // 파일 이름을 망가뜨릴 수 있는 문자(경로 구분자·점·한글 등)는 모두 지운 뒤 비어 있으면 all 로 갑니다.
+  const safe = (period || 'all')
+    .replace(/[^0-9A-Za-z_~]/g, '_')
+    .replace(/^[_~]+|[_~]+$/g, '')
+    .replace(/_/g, '');
+  return `execution_${safe || 'all'}_${stamp}.csv`;
 }
 
 export function formatKRW(n: number): string {

@@ -27,15 +27,23 @@ jobs:
 
       - run: npm ci
 
-      # 콘텐츠 게이트: 출처 없는 문서, 검증 대기 문서의 법적 수치, 섞임 문자, 끊긴 내부 링크를여기서 잡는다.
+      # 콘텐츠 게이트: 출처 없는 문서, 검증 대기 문서의 법적 수치, 섞임 문자, 끊긴 내부 링크를 여기서 잡는다.
       - name: Check content
         run: npm run check:content
+
+      # 타입 검사: 화면 스크립트의 변수 중복·non-standard API 같은, 단위 테스트가 못 잡는 오류.
+      - name: Type check
+        run: npx astro check
 
       - name: Unit tests
         run: npm test
 
       - name: Build
         run: npm run build
+
+      # 배포될 파일 단위 점검: 끊긴 내부 링크 0건, 모든 화면 제목에 (비공식).
+      - name: Check build output
+        run: npm run check:dist
 
       - uses: actions/upload-pages-artifact@v4
         with:

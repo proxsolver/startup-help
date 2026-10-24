@@ -27,7 +27,7 @@ const related = (await getCollection('guides', (e) => e.data.category === d.cate
 const fmt = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'long' }).format(d.updatedAt);
 ---
 
-<Base title={`${d.title} — 모두의 창업 정산 도우미`} description={d.summary} path={path}>
+<Base title={d.title} description={d.summary} path={path}>
   <article class="measure">
     <p class="small"><a href={p('/guide/')}>안내</a> › <a href={p(`/guide/${d.category}/`)}>{categoryTitle(d.category)}</a></p>
     <h1>{d.title}</h1>

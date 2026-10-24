@@ -25,8 +25,9 @@ export interface ChecklistStage {
 }
 
 const MODOO = { label: '모두의 창업', url: 'https://modoo.or.kr' };
-const KISED = { label: '창업진흥원', url: 'https://www.kised.or.kr' };
+const KISED = { label: '창업진흥원 사업공고', url: 'https://www.kised.or.kr/menu.es?mid=a10302000000' };
 const BIZINFO = { label: '기업마당', url: 'https://www.bizinfo.go.kr' };
+const OPS_RULE = { label: '운영요령 원문', url: 'https://www.law.go.kr/LSW/admRulLsInfoP.do?admRulSeq=2100000222594' };
 
 export const CHECKLIST: ChecklistStage[] = [
   {
@@ -136,15 +137,21 @@ export const CHECKLIST: ChecklistStage[] = [
       },
       {
         id: 'set-04',
-        label: '인건비·외주 지급 관련 서류 세트를 따로 묶었다',
-        why: '집행 증빙과 별개의 서류가 필요한 영역입니다. 해당 여부와 서식은 담당 기관 기준을 확인해야 합니다.',
-        link: { label: '창업진흥원', url: KISED.url }
+        label: '인건비 비목이 배정됐다면, 관련 서류 세트를 따로 묶었다',
+        why: '근로·지급 기록, 4대보험 납부, 원천세 신고는 집행 증빙과 별개의 서류가 필요한 영역입니다. 지원금 구조에 인건비 과목이 없는 사업도 있으니 배정 예산표부터 확인하세요.',
+        link: { label: '창업진흥원 사업공고', url: KISED.url }
+      },
+      {
+        id: 'set-07',
+        label: '외주·위탁 지출이 있다면 계약서·결과물·검수 기록을 한 세트로 묶었다',
+        why: '일반적인 창업지원 지침 계열은 외주용역비에 계약서(과업내용 포함), 세금계산서, 결과보고서, 검수조서, 거래처 사업자등록증·통장사본을 함께 요구하는 목록을 둡니다. 이 사업에서 어디까지 요구하는지, 선금·심의 제한이 있는지는 세부관리기준 확인이 필요합니다.',
+        guide: '/guide/settlement/settlement-package/'
       },
       {
         id: 'set-05',
         label: '제출 후 서류 보존 기간을 확인해 캘린더에 넣었다',
-        why: '법정 보존기간은 사업과 세법 기준이 달라서 이 사이트에서 값을 확정하지 않았습니다. 담당 기관 안내에서 확인이 필요합니다.',
-        link: { label: '모두의 창업 안내', url: MODOO.url }
+        why: '지원사업 서류와 세무 증빙은 근거도, 기간을 세기 시작하는 시점도 다릅니다. 법정 보존기간은 사업과 세법 기준이 달라서 이 사이트에서 값을 확정하지 않았습니다. 담당 기관 안내와 법령 원문에서 확인이 필요합니다.',
+        link: { label: '운영요령 원문 (국가법령정보센터)', url: OPS_RULE.url }
       },
       {
         id: 'set-06',

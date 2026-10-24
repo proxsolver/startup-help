@@ -8,9 +8,13 @@ order: 1
 updatedAt: 2026-10-24
 verification: 'verified'
 sources:
-  - label: '집행 정리 도구'
-    url: 'https://github.com/proxsolver/startup-help'
+  - label: '모두의 창업 (제출 서식·요구 확인)'
+    url: 'https://modoo.or.kr'
+  - label: '홈택스 (현금영수증·카드 내역 조회)'
+    url: 'https://www.hometax.go.kr'
 ---
+
+> 이 문서는 **이 사이트가 권장하는 자체 정리 순서**입니다. 법령이나 기관이 요구하는 절차가 아니라, 정산 직전에 몰리지 않기 위한 실무 습관입니다. 실제 제출 요구·서식은 담당 주관기관 안내에서 확인하세요.
 
 ## 매달 5단계
 

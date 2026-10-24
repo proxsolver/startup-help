@@ -21,6 +21,7 @@ const today = new Date().toISOString().slice(0, 10);
 
   <div class="card no-print" style="margin-bottom:1.2rem">
     <h2 style="margin-top:0;font-size:1.05rem;border:0;padding:0">새 지출 추가</h2>
+    <p class="notice" data-load-note hidden style="margin-top:0"></p>
     <div class="row" role="group" aria-label="지출 입력">
       <div>
         <label for="f-date">지출일</label>
@@ -32,7 +33,7 @@ const today = new Date().toISOString().slice(0, 10);
       </div>
       <div>
         <label for="f-amount">금액 (원)</label>
-        <input type="number" id="f-amount" min="0" step="1" placeholder="0" inputmode="numeric" />
+        <input type="number" id="f-amount" min="1" step="1" placeholder="예: 150000" inputmode="numeric" />
       </div>
       <div>
         <label for="f-budget">비목(예산과목)</label>
@@ -212,8 +213,11 @@ const today = new Date().toISOString().slice(0, 10);
       <label for="import-file">JSON 복원</label>
       <input type="file" id="import-file" accept="application/json,.json" />
     </div>
-    <div class="shrink"><button class="btn ghost" type="button" data-clear>모두 지우기</button></div>
+    <div class="shrink"><button class="btn ghost" type="button" data-clear>지출 목록 비우기</button></div>
   </div>
+  <p class="small muted no-print" style="margin-top:.4rem">
+    <strong>지출 목록 비우기</strong>는 이 브라우저에 저장된 지출 항목만 삭제합니다. 체크리스트 확인 결과는 그대로 남습니다.
+  </p>
 
   <p class="notice" data-storage-warning hidden>
     <strong>브라우저 저장에 실패했습니다</strong>
@@ -226,8 +230,8 @@ const today = new Date().toISOString().slice(0, 10);
   import {
     computeTotals,
     csvFileName,
-    currentPeriod,
     evidenceGapList,
+    exportPeriod,
     filterEntries,
     formatKRW,
     makeId,
@@ -238,12 +242,14 @@ const today = new Date().toISOString().slice(0, 10);
   } from '../lib/receipts';
   import {
     backupFileName,
-    clearState,
-    emptyState,
-    loadState,
+    clearEntries,
+    loadStateDetailed,
     parseBackup,
-    saveState,
-    serializeState
+    replaceEntries,
+    saveEntries,
+    saveMeta,
+    serializeState,
+    STORAGE_KEY
   } from '../lib/storage';
 
   const root = document.querySelector<HTMLElement>('[data-tool]');
@@ -260,14 +266,36 @@ const today = new Date().toISOString().slice(0, 10);
     const status = el('status');
     const formMsg = el('form-msg');
     const warning = el('storage-warning');
+    const loadNote = el('load-note');
 
     const FILTER_IDS = ['q-from', 'q-to', 'q-budget', 'q-pay', 'q-period', 'q-evidence', 'q-estate', 'q-submit', 'q-text'];
     const SUGGESTED = new Set(
       Array.from(document.querySelectorAll('#budget-list option')).map((o) => (o as HTMLOptionElement).value)
     );
 
-    let state = loadState();
+    const loaded = loadStateDetailed();
+    let state = loaded.state;
     let filters: Filters = {};
+    /** 지운 id 기록(저장소에 함께 둔다). 오래된 화면을 든 다른 탭이 같은 id 를 보내도 되살아나지 않습니다. */
+    let removedIds: string[] = loaded.state.removed.slice();
+    let droppedCount = loaded.dropped;
+    let writeBlocked = loaded.future;
+
+    function showLoadNote() {
+      if (!loadNote) return;
+      const notes: string[] = [];
+      if (writeBlocked) {
+        notes.push(
+          '이 브라우저에 이 사이트의 더 새로운 형식 데이터가 있습니다. 형식을 되돌리면 데이터를 잃으므로 저장을 멈추고 읽기만 합니다. JSON 백업을 받은 뒤 그 버전을 쓰는 화면에서 열어 주세요.'
+        );
+      }
+      if (droppedCount > 0) {
+        notes.push(`저장된 항목 중 형식 때문에 읽지 못한 ${droppedCount}건이 있습니다. 그 행은 화면에 없는 것과 같고, 새로 저장하면 저장소에서 사라집니다.`);
+      }
+      loadNote.textContent = notes.join(' ');
+      loadNote.hidden = notes.length === 0;
+    }
+    showLoadNote();
 
     function field(id: string): string {
       return val(id).trim();
@@ -302,14 +330,20 @@ const today = new Date().toISOString().slice(0, 10);
       return tr;
     }
 
-    /** 비목 필터는 예시 목록에 없던 실제 입력값도 드롭다운에 쌓이도록 갱신합니다. */
-    function syncBudgetOptions(items: ReceiptEntry[], keep: string) {
+    /**
+     * 비목 필터는 예시 목록에 없던 실제 입력값도 드롭다운에 쌓이도록 갱신합니다.
+     * 반환값은 갱신 뒤 드롭다운에 실제로 선택된 값 — 지금 선택된 항목은 어떤 경우에도
+     * 목록에서 지우지 않습니다(지우면 화면은 '전체' 를 보이는데 필터는 걸린 채로 집계되는 사고가 납니다).
+     */
+    function syncBudgetOptions(items: ReceiptEntry[], keep: string): string {
       const select = input<HTMLSelectElement>('q-budget');
-      if (!select) return;
+      if (!select) return keep;
       const needed = new Set(items.map((e) => e.budgetItem).filter((b) => !SUGGESTED.has(b)));
-      for (const opt of Array.from(select.options)) {
+      // removeOption() 은 WebKit 전용이라 표준 API 인 remove(index) 로 지웁니다(뒤에서부터).
+      for (let i = select.options.length - 1; i >= 0; i--) {
+        const opt = select.options[i];
         const v = opt.value;
-        if (v && v !== '' && !SUGGESTED.has(v) && !needed.has(v)) select.removeOption(v);
+        if (v && v !== keep && !SUGGESTED.has(v) && !needed.has(v)) select.remove(i);
       }
       const present = new Set(Array.from(select.options).map((o) => o.value));
       for (const key of [...needed].sort((a, b) => a.localeCompare(b, 'ko'))) {
@@ -320,6 +354,8 @@ const today = new Date().toISOString().slice(0, 10);
         select.appendChild(opt);
       }
       select.value = keep;
+      // keep 이 목록에 없던 값이라 브라우저가 선택을 유지 못 한 경우: 실제 표시된 값에 맞춰 필터를 고칩니다.
+      return select.value;
     }
 
     function render() {
@@ -409,32 +445,61 @@ const today = new Date().toISOString().slice(0, 10);
         foot.hidden = list.length === 0;
         footAmount.textContent = formatKRW(totals.total);
       }
-      syncBudgetOptions(state.entries, val('q-budget'));
+      const shownBudget = syncBudgetOptions(state.entries, val('q-budget'));
+      if (shownBudget !== (filters.budgetItem ?? '')) {
+        filters = { ...filters, budgetItem: shownBudget || undefined };
+      }
       if (status) {
-        status.textContent = `전체 ${state.entries.length}건 중 ${list.length}건 표시 · 데이터는 이 브라우저에만 저장됩니다`;
+        const saved = writeBlocked ? ' · 더 새로운 형식 데이터라 저장은 멈춰 있음' : '';
+        status.textContent = `전체 ${state.entries.length}건 중 ${list.length}건 표시 · 데이터는 이 브라우저에만 저장됩니다${saved}`;
       }
     }
 
+    /** 저장. 실패·차단은 화면에 알리고, 다른 탭이 추가한 행은 합쳐서 가져옵니다. */
     function persist() {
-      const ok = saveState(state);
-      if (warning) warning.hidden = ok;
+      if (writeBlocked) {
+        if (warning) warning.hidden = false;
+        showLoadNote();
+        return;
+      }
+      const res = saveEntries(state.entries, removedIds);
+      if (res.future) {
+        writeBlocked = true;
+        showLoadNote();
+        if (warning) warning.hidden = false;
+        render();
+        return;
+      }
+      if (res.ok) {
+        state.entries = res.merged;
+        removedIds = res.removed;
+      }
+      if (warning) warning.hidden = res.ok;
     }
 
     function remove(id: string) {
       const before = state.entries.length;
       state.entries = state.entries.filter((e) => e.id !== id);
       if (state.entries.length !== before) {
+        removedIds.push(id);
         persist();
         render();
       }
     }
 
     function add() {
+      const rawAmount = field('f-amount');
+      const amount = Number(rawAmount);
+      if (rawAmount === '' || !Number.isFinite(amount) || amount <= 0) {
+        if (formMsg) formMsg.textContent = '금액을 1 원 이상의 숫자로 입력하세요. 0 원·빈값은 저장하지 않습니다.';
+        input<HTMLInputElement>('f-amount')?.focus();
+        return;
+      }
       const entry = normalizeEntry({
         id: makeId(),
         date: field('f-date'),
         vendor: field('f-vendor'),
-        amount: Number(field('f-amount')),
+        amount,
         budgetItem: field('f-budget'),
         payMethod: val('f-pay'),
         periodState: val('f-period'),
@@ -444,7 +509,7 @@ const today = new Date().toISOString().slice(0, 10);
         memo: field('f-memo')
       });
       if (!entry) {
-        if (formMsg) formMsg.textContent = '지출일과 0 이상의 금액이 필요합니다.';
+        if (formMsg) formMsg.textContent = '지출일 형식(YYYY-MM-DD)을 확인해 주세요.';
         return;
       }
       state.entries.push(entry);
@@ -455,10 +520,10 @@ const today = new Date().toISOString().slice(0, 10);
         formMsg.textContent = `${entry.date} · ${entry.vendor || '이름 없음'} ${formatKRW(entry.amount)} · ${entry.budgetItem} 추가됨`;
       }
       const vendor = input<HTMLInputElement>('f-vendor');
-      const amount = input<HTMLInputElement>('f-amount');
+      const amountInput = input<HTMLInputElement>('f-amount');
       const memo = input<HTMLInputElement>('f-memo');
       if (vendor) vendor.value = '';
-      if (amount) amount.value = '';
+      if (amountInput) amountInput.value = '';
       if (memo) memo.value = '';
       vendor?.focus();
     }
@@ -485,27 +550,42 @@ const today = new Date().toISOString().slice(0, 10);
       if (node instanceof HTMLInputElement && node.type === 'search') node.addEventListener('input', syncFilters);
     }
     el('reset-filters')?.addEventListener('click', () => {
-      for (const id of FILTER_IDS) {
-        const node = input<HTMLInputElement | HTMLSelectElement>(id);
-        if (node) node.value = '';
-      }
-      filters = {};
+      resetFilterControls();
       render();
+      if (status) status.textContent = '필터를 해제했습니다.';
     });
 
     el('export-csv')?.addEventListener('click', () => {
+      // 화면에 보이는(필터 적용) 결과만 내보냅니다. 조건에 안 맞는 행을 몰래 포함시키지 않습니다.
       const visible = filterEntries(state.entries, filters);
-      const source = visible.length > 0 ? visible : state.entries;
-      if (source.length === 0) {
-        if (status) status.textContent = '내보낼 데이터가 없습니다.';
+      if (visible.length === 0) {
+        if (status) {
+          status.textContent =
+            state.entries.length > 0
+              ? '필터 조건에 맞는 건이 없어 내보낼 수 없습니다. 필터를 해제하거나 기간을 넓혀 주세요.'
+              : '내보낼 데이터가 없습니다.';
+        }
         return;
       }
-      download(csvFileName(currentPeriod()), toCsvFile(source), 'text/csv;charset=utf-8');
+      const name = csvFileName(exportPeriod(filters));
+      download(name, toCsvFile(visible), 'text/csv;charset=utf-8');
+      state.lastExportAt = new Date().toISOString();
+      saveMeta({ lastExportAt: state.lastExportAt });
+      if (status) status.textContent = `${name} · ${visible.length}건 내보냄 (화면에 표시된 결과만)`;
     });
 
     el('export-json')?.addEventListener('click', () => {
       download(backupFileName(), serializeState(state), 'application/json;charset=utf-8');
     });
+
+    /** 필터 DOM 과 상태(filters)를 한 번에 초기화 — 두어가 어긋나는 창을 없앱니다. */
+    function resetFilterControls() {
+      for (const id of FILTER_IDS) {
+        const node = input<HTMLInputElement | HTMLSelectElement>(id);
+        if (node) node.value = '';
+      }
+      filters = {};
+    }
 
     const fileInput = input<HTMLInputElement>('import-file');
     fileInput?.addEventListener('change', () => {
@@ -514,29 +594,88 @@ const today = new Date().toISOString().slice(0, 10);
       const reader = new FileReader();
       reader.onload = () => {
         const text = String(reader.result ?? '');
-        const { state: restored, dropped } = parseBackup(text);
-        if (restored.entries.length === 0 && !confirm('이 파일에서 읽을 수 있는 지출 항목이 없습니다. 현재 데이터를 그대로 둘까요?')) {
+        const { state: restored, dropped, future } = parseBackup(text);
+        if (future) {
+          if (status) status.textContent = '이 파일은 이 사이트의 더 새로운 형식 데이터입니다. 복원하지 않았습니다.';
+          fileInput.value = '';
           return;
         }
-        if (!confirm(`${restored.entries.length}건을 복원합니다. 현재 목록(${state.entries.length}건)은 대체됩니다.`)) return;
-        state = restored;
-        filters = {};
-        persist();
+        if (restored.entries.length === 0 && !confirm('이 파일에서 읽을 수 있는 지출 항목이 없습니다. 현재 데이터를 그대로 둘까요?')) {
+          fileInput.value = '';
+          return;
+        }
+        if (!confirm(`${restored.entries.length}건을 복원합니다. 현재 목록(${state.entries.length}건)은 대체됩니다.`)) {
+          fileInput.value = '';
+          return;
+        }
+        state.entries = restored.entries;
+        removedIds = [];
+        droppedCount = dropped;
+        resetFilterControls();
+        // 복원은 목록 전체를 대체합니다(다른 탭 행과 병합하지 않음). 체크리스트는 저장된 값 그대로 둡니다.
+        const res = replaceEntries(state.entries);
+        writeBlocked = res.future;
+        if (warning) warning.hidden = res.ok;
+        showLoadNote();
         render();
-        if (status) status.textContent = dropped > 0 ? `복원 완료 · 형식 오류 ${dropped}건은 건너뛰었습니다` : '복원 완료';
+        const skipped = dropped > 0 ? ` · 형식 오류 ${dropped}건은 건너뜀` : '';
+        if (status) status.textContent = `복원 완료 · ${state.entries.length}건${skipped}`;
+        fileInput.value = '';
+      };
+      reader.onerror = () => {
+        if (status) status.textContent = '파일을 읽을 수 없습니다.';
         fileInput.value = '';
       };
       reader.readAsText(file, 'utf-8');
     });
 
     el('clear')?.addEventListener('click', () => {
-      if (state.entries.length === 0 && Object.keys(state.checklist).length === 0) return;
-      if (!confirm('이 브라우저에 저장된 지출 목록을 모두 지웁니다. 되돌릴 수 없습니다. 계속할까요?')) return;
-      clearState();
-      state = emptyState();
-      filters = {};
+      if (state.entries.length === 0) {
+        if (status) status.textContent = '지출 목록에 남은 항목이 없습니다. (체크리스트는 비우지 않았습니다.)';
+        return;
+      }
+      if (!confirm(`이 브라우저에 저장된 지출 ${state.entries.length}건을 모두 지웁니다. 되돌릴 수 없습니다. 계속할까요?`)) return;
+      // 지출 항목만 삭제합니다. 체크리스트 확인 결과는 별도 데이터입니다.
+      const res = clearEntries();
+      if (res.future || writeBlocked || !res.ok) {
+        if (res.future) writeBlocked = true;
+        if (warning) warning.hidden = true;
+        if (status) status.textContent = res.future ? '더 새로운 형식 데이터라 저장소를 비우지 않았습니다.' : '저장소에 쓰지 못했습니다.';
+        render();
+        showLoadNote();
+        return;
+      }
+      state.entries = [];
+      removedIds = res.removed;
+      droppedCount = 0;
+      showLoadNote();
       render();
-      if (status) status.textContent = '저장된 지출 목록을 비웠습니다.';
+      if (status) status.textContent = '지출 목록을 비웠습니다. 체크리스트 확인 결과는 그대로 남아 있습니다.';
+    });
+
+    // 다른 탭에서 저장한 내용은 이 화면에 자동 반영합니다(합치기 규칙은 saveEntries 와 동일).
+    window.addEventListener('storage', (event) => {
+      if (event.key !== null && event.key !== STORAGE_KEY) return;
+      const fresh = loadStateDetailed();
+      if (fresh.future) {
+        writeBlocked = true;
+        showLoadNote();
+        return;
+      }
+      const res = saveEntries(state.entries, removedIds);
+      if (res.future) {
+        writeBlocked = true;
+        showLoadNote();
+        render();
+        return;
+      }
+      if (res.ok) {
+        state.entries = res.merged;
+        removedIds = res.removed;
+      }
+      droppedCount = fresh.dropped;
+      showLoadNote();
+      render();
     });
 
     render();
