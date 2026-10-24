@@ -1,7 +1,9 @@
 // @ts-check
 /**
  * 콘텐츠 게이트. 게시 전에 아래를 검사하고 하나라도 걸리면 실패시킵니다.
- *   1) 모든 문서에 공식 출처 링크(sources)가 1개 이상 있다 (도메인은 공공 기관 영역으로 제한)
+ *   1) 모든 문서에 공식 출처 링크(sources)가 1개 이상 있다 — 도메인은 공공 기관 영역으로 제한하되,
+ *      카드사 자체 절차처럼 기관 사이트에 없는 정보는 사람이 원문을 확인해 등록한 회사 도메인만 예외로 봅니다
+ *      (label 에 회사 이름이 반드시 들어 있어야 통과).
  *   2) verification: pending 인 문서에 검증 메모가 있다 — 기본값이 pending 이므로 verification 을
  *      아예 적지 않으면 pending 으로 취급되어 메모 요구·수치 금지가 함께 걸립니다
  *   3) pending 문서가 법적 수치·제재 표현(만원/억원/가산세/제N조/N년 보존/기한 수치)을 쓰지 않았다
@@ -95,6 +97,14 @@ const LEGAL_FIGURE = [/제\s?\d+조/, /\d\s*(만원|억원)/, /\d+\s*년\s*(간\
 /** 독자가 그 자리에서 다시 확인할 수 있는 출처(법령 원문·국세청) */
 const RECHECK_HOSTS = /(^|\.)(law\.go\.kr|nts\.go\.kr|hometax\.go\.kr)$/i;
 
+/**
+ * 카드사·결제사 자체 절차의 1차 출처는 그 회사 안내 페이지입니다(신한카드 발급 창구처럼
+ * 기관 사이트에는 아예 없는 정보). 다만 임의 사도메인을 열면 블로그·기사 인용 구멍이 생기므로,
+ * 사람이 원문을 열어 확인한 회사 도메인만 아래에 낱개로 적습니다. label 에 회사 이름을
+ * 반드시 넣게 해, 허용 도메인에 아무 글이나 얹어 통과시키는 것을 막습니다.
+ */
+const ISSUER_SOURCES = [{ host: 'shinhancard.com', name: '신한카드' }];
+
 const DRIFT = /[\u3040-\u30ff\u4e00-\u9fff]/g;
 
 /** @type {string[]} */
@@ -103,8 +113,9 @@ for (const f of files) {
   const rel = posix.relative(join(ROOT, 'src'), f.path);
   const hasSources = /sources:\s*\n(?:\s*-\s+label:.*\n\s*url:\s*'?\S+'?\n)/.test(f.fm) || /url:\s*['"]https?:\/\//.test(f.fm);
   if (!hasSources) problems.push(`${rel}: 공식 출처(sources)가 없습니다`);
-  // 출처로 적을 수 있는 도메인은 공공 기관 영역으로 제한합니다(블로그·기사 인용 방지).
+  // 출처로 적을 수 있는 도메인은 공공 기관 영역 + 확인해 둔 카드사 안내 페이지로 제한합니다.
   const sourceUrls = [...f.fm.matchAll(/url:\s*['"]?(https?:\/\/[^\s'"]+)/g)].map((m) => m[1]);
+  const labeled = [...f.fm.matchAll(/-\s+label:\s*'([^']*)'\s*\n\s*url:\s*'([^']+)'/g)].map((m) => ({ label: m[1], url: m[2] }));
   for (const u of sourceUrls) {
     let host = '';
     try {
@@ -113,8 +124,17 @@ for (const f of files) {
       problems.push(`${rel}: 출처 URL 형식이 올바르지 않습니다 → ${u}`);
       continue;
     }
-    if (!/(^|\.)(go\.kr|or\.kr|gov\.kr|law\.go\.kr)$/i.test(host)) {
-      problems.push(`${rel}: 출처 도메인이 공공 기관 영역이 아닙니다 → ${host}`);
+    const institutional = /(^|\.)(go\.kr|or\.kr|gov\.kr)$/i.test(host);
+    const issuer = ISSUER_SOURCES.find((s) => host === s.host || host.endsWith(`.${s.host}`));
+    if (!institutional && !issuer) {
+      problems.push(`${rel}: 출처 도메인이 공공 기관 영역이 아니고 확인해 둔 회사 도메인 목록에도 없습니다 → ${host}`);
+      continue;
+    }
+    if (issuer) {
+      const hit = labeled.find((s) => s.url === u);
+      if (!hit) problems.push(`${rel}: '${host}' 출처는 label·url 을 따옴표로 함께 적어야 합니다(회사 이름 확인용)`);
+      else if (!hit.label.includes(issuer.name))
+        problems.push(`${rel}: '${host}' 출처의 label 에 '${issuer.name}' 이름이 없습니다 → '${hit.label}'`);
     }
   }
 
