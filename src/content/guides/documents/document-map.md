@@ -46,5 +46,5 @@ sources:
 ## 관련
 
 - [서류 어디서 받아오나](/guide/documents/issuing-channels/)
-- [신한카드에서 집행 내역·증빙 받기](/guide/documents/shinhan-card-records/)
+- [카드사에서 서류 받아오기](/guide/documents/card-records/)
 - [정산 제출 꾸러미 흐름](/guide/settlement/settlement-package/)

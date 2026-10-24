@@ -1,0 +1,26 @@
+---
+// 옛 주소 /guide/documents/shinhan-card-records/ 처리용 리다이렉트 페이지.
+// 문서를 '카드사에서 서류 받아오기' 로 옮기면서 분류 체계(메뉴)에 맞게 이름을 바꿨는데,
+// 이미 열어 본 주소가 404 로 남으면 당황스럽습니다. GitHub Pages 는 서버 리다이렉트를 못 하므로
+// 이 한 장의 html 이 대신 옮겨 줍니다. 검색 엔진에는 noindex 로 남깁니다(본 문서가 정본).
+import { absoluteUrl, p } from '../../../lib/url';
+
+const to = p('/guide/documents/card-records/');
+const canonical = absoluteUrl(Astro.site, '/guide/documents/card-records/');
+---
+
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>카드사에서 서류 받아오기 · 모두의 창업 정산 도우미 (비공식)</title>
+    <meta http-equiv="refresh" content={`0;url=${to}`} />
+    <meta name="robots" content="noindex" />
+    <link rel="canonical" href={canonical} />
+  </head>
+  <body>
+    <p>
+      이 안내는 <a href={to}>카드사에서 서류 받아오기</a> 로 옮겨졌습니다. 자동으로 움직이지 않으면 위의 링크를 눌러 주세요.
+    </p>
+  </body>
+</html>

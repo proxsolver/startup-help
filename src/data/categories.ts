@@ -17,7 +17,7 @@ export const CATEGORY_META = [
   {
     key: 'documents',
     title: '문서·서식',
-    desc: '무엇을 어디에서 받아 제출하는지'
+    desc: '무엇을 어디에서 받아 제출하는지 (홈택스·카드사 발급 창구 포함)'
   }
 ] as const;
 

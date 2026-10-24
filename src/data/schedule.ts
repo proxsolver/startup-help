@@ -68,8 +68,8 @@ const HTS: ScheduleSource = { label: '홈택스', url: 'https://www.hometax.go.k
 const NTS: ScheduleSource = { label: '국세청', url: 'https://www.nts.go.kr' };
 const SELF: ScheduleSource = { label: '월 마감 루틴 안내 (이 사이트)', url: 'https://proxsolver.github.io/startup-help/guide/settlement/monthly-close/' };
 const CARD_DOC: ScheduleSource = {
-  label: '신한카드에서 집행 내역·증빙 받기 (이 사이트)',
-  url: 'https://proxsolver.github.io/startup-help/guide/documents/shinhan-card-records/'
+  label: '카드사에서 서류 받아오기 (이 사이트)',
+  url: 'https://proxsolver.github.io/startup-help/guide/documents/card-records/'
 };
 
 export const SCHEDULE_ITEMS: ScheduleItem[] = [

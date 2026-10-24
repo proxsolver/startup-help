@@ -41,7 +41,7 @@ sources:
 
 ## 관련
 
-- [신한카드에서 집행 내역·증빙 받기](/guide/documents/shinhan-card-records/) — 카드사 창구 하나를 실제로 열어 확인한 예시 문서
+- [카드사에서 서류 받아오기](/guide/documents/card-records/) — 신한카드 창구를 실제로 열어 확인해 둔 문서
 - [문서 지도](/guide/documents/document-map/)
 - [수취 서류 종류와 받는 법](/guide/expense/evidence-types/)
 - [월 마감 루틴](/guide/settlement/monthly-close/)

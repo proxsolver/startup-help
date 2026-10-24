@@ -59,5 +59,5 @@ sources:
 
 - [수취 서류 종류와 받는 법](/guide/expense/evidence-types/)
 - [월 마감 루틴](/guide/settlement/monthly-close/)
-- [신한카드에서 집행 내역·증빙 받기](/guide/documents/shinhan-card-records/)
+- [카드사에서 서류 받아오기](/guide/documents/card-records/)
 - [집행 정리 도구](/tools/receipts/)

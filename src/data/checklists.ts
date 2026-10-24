@@ -71,7 +71,7 @@ export const CHECKLIST: ChecklistStage[] = [
         id: 'setup-06',
         label: '카드사에서 어떤 자료를 어떤 계정으로 받는지 명의별로 정해 뒀다',
         why: '같은 카드사라도 개인·개인사업자·법인 명의의 발급 창구와 권한이 다릅니다. 법인·기관 명의 카드는 참여자 로그인으로 못 받는 자료가 있어 담당 부서 요청이 필요합니다. 신한카드 창구는 실제로 열어 확인해 문서로 두었습니다.',
-        guide: '/guide/documents/shinhan-card-records/'
+        guide: '/guide/documents/card-records/'
       }
     ]
   },
