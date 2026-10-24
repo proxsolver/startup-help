@@ -67,6 +67,10 @@ const NTS_WITHHOLD: ScheduleSource = {
 const HTS: ScheduleSource = { label: '홈택스', url: 'https://www.hometax.go.kr' };
 const NTS: ScheduleSource = { label: '국세청', url: 'https://www.nts.go.kr' };
 const SELF: ScheduleSource = { label: '월 마감 루틴 안내 (이 사이트)', url: 'https://proxsolver.github.io/startup-help/guide/settlement/monthly-close/' };
+const CARD_DOC: ScheduleSource = {
+  label: '신한카드에서 집행 내역·증빙 받기 (이 사이트)',
+  url: 'https://proxsolver.github.io/startup-help/guide/documents/shinhan-card-records/'
+};
 
 export const SCHEDULE_ITEMS: ScheduleItem[] = [
   {
@@ -89,6 +93,17 @@ export const SCHEDULE_ITEMS: ScheduleItem[] = [
     appliesTo: ['execute'],
     decidedBy: '협약서 · 사업별 세부관리기준 · 배정 주관기관 공지',
     sources: [OPS_RULE, MGMT_GUIDE, MODOO]
+  },
+  {
+    id: 'card-records',
+    label: '카드사 자료 확보 창구 확정',
+    detail:
+      '카드 명의(개인·개인사업자·법인)별로 어떤 자료를 어떤 계정에서 받을 수 있는지 집행 전에 정해 둡니다. 발급 창구·권한·조회 범위는 카드사 정책 사항이라 이 사이트가 단정하지 않고, 실제로 열어 확인한 회사 안내만 문서로 적었습니다. 요구하는 서류 이름은 담당 기관에서 먼저 받아 카드사 요청서에 그대로 씁니다.',
+    dueText: null,
+    verification: 'pending',
+    appliesTo: ['execute', 'settle'],
+    decidedBy: '카드사 안내 페이지·고객센터 · 협약서상 요구 서류 이름',
+    sources: [CARD_DOC, MODOO]
   },
   {
     id: 'budget-lines',
