@@ -51,7 +51,8 @@ export function normalizeState(raw: unknown): { state: AppState; dropped: number
   }
   return {
     state: {
-      // v1 은 필드 추가만 있었으므로 구버전 데이터도 그대로 수용합니다.
+      // v1 데이터(카드/현금 5종, category 필드)는 sanitizeEntries → normalizeEntry 에서
+      // v2(비목·전용카드·집행기간·수취/제출 상태)로 자동 승격됩니다. 읽을 수 없는 행만 버립니다.
       schemaVersion: SCHEMA_VERSION,
       entries,
       checklist,

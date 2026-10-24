@@ -1,5 +1,12 @@
 ---
-import { CATEGORIES, EVIDENCE_TYPES, PAY_METHODS } from '../lib/receipts';
+import {
+  CATEGORY_SUGGESTIONS,
+  EVIDENCE_STATES,
+  EVIDENCE_TYPES,
+  PAY_METHODS,
+  PERIOD_STATES,
+  SUBMIT_STATES
+} from '../lib/receipts';
 
 const today = new Date().toISOString().slice(0, 10);
 ---
@@ -7,15 +14,16 @@ const today = new Date().toISOString().slice(0, 10);
 <div id="receipt-tool" data-tool>
   <p class="notice info no-print">
     <strong>서버에 올라가지 않는 도구입니다</strong>
-    입력한 내용은 이 브라우저의 저장소에만 들어갑니다. 계정을 만들거나 파일을 전송하지 않아도 됩니다.
+    입력한 내용은 이 브라우저의 저장소에만 들어갑니다. 계정을 만들거나 영수증 파일을 전송하지 않아도 됩니다.
     다만 브라우저 데이터를 비우면 사라지므로, 마감 뒤에는 아래 CSV·JSON 내보내기로 백업하세요.
+    여기서 고르는 항목은 정리용 분류일 뿐이며, 실제 인정 여부·서식 기준은 담당 주관기관 안내를 확인해야 합니다.
   </p>
 
   <div class="card no-print" style="margin-bottom:1.2rem">
     <h2 style="margin-top:0;font-size:1.05rem;border:0;padding:0">새 지출 추가</h2>
     <div class="row" role="group" aria-label="지출 입력">
       <div>
-        <label for="f-date">날짜</label>
+        <label for="f-date">지출일</label>
         <input type="date" id="f-date" value={today} required />
       </div>
       <div>
@@ -27,22 +35,37 @@ const today = new Date().toISOString().slice(0, 10);
         <input type="number" id="f-amount" min="0" step="1" placeholder="0" inputmode="numeric" />
       </div>
       <div>
-        <label for="f-pay">결제수단</label>
+        <label for="f-budget">비목(예산과목)</label>
+        <input type="text" id="f-budget" list="budget-list" placeholder="예: 시제품 제작" autocomplete="off" />
+        <datalist id="budget-list">
+          {CATEGORY_SUGGESTIONS.map((c) => <option value={c} />)}
+        </datalist>
+      </div>
+      <div>
+        <label for="f-pay">결제경로</label>
         <select id="f-pay">{PAY_METHODS.map((m) => <option value={m}>{m}</option>)}</select>
       </div>
       <div>
-        <label for="f-evidence">증빙 구분</label>
+        <label for="f-period">집행 기간</label>
+        <select id="f-period">{PERIOD_STATES.map((s) => <option value={s}>{s}</option>)}</select>
+      </div>
+      <div>
+        <label for="f-evidence">증빙 종류</label>
         <select id="f-evidence">
           {EVIDENCE_TYPES.map((t) => <option value={t} selected={t === '없음'}>{t}</option>)}
         </select>
       </div>
       <div>
-        <label for="f-category">분류</label>
-        <select id="f-category">{CATEGORIES.map((c) => <option value={c}>{c}</option>)}</select>
+        <label for="f-estate">수취 상태</label>
+        <select id="f-estate">{EVIDENCE_STATES.map((s) => <option value={s}>{s}</option>)}</select>
+      </div>
+      <div>
+        <label for="f-submit">제출 상태</label>
+        <select id="f-submit">{SUBMIT_STATES.map((s) => <option value={s}>{s}</option>)}</select>
       </div>
       <div style="flex:2 1 220px">
         <label for="f-memo">메모</label>
-        <input type="text" id="f-memo" placeholder="왜 썼는지 한 줄" autocomplete="off" />
+        <input type="text" id="f-memo" placeholder="용도·요청받은 사람 한 줄" autocomplete="off" />
       </div>
       <div class="shrink">
         <button class="btn" type="button" data-add>추가</button>
@@ -63,21 +86,49 @@ const today = new Date().toISOString().slice(0, 10);
         <input type="date" id="q-to" />
       </div>
       <div>
-        <label for="q-category">분류</label>
-        <select id="q-category">
+        <label for="q-budget">비목</label>
+        <select id="q-budget">
           <option value="">전체</option>
-          {CATEGORIES.map((c) => <option value={c}>{c}</option>)}
+          {CATEGORY_SUGGESTIONS.map((c) => <option value={c}>{c}</option>)}
         </select>
       </div>
       <div>
-        <label for="q-evidence">증빙</label>
+        <label for="q-pay">결제경로</label>
+        <select id="q-pay">
+          <option value="">전체</option>
+          {PAY_METHODS.map((m) => <option value={m}>{m}</option>)}
+        </select>
+      </div>
+      <div>
+        <label for="q-period">집행 기간</label>
+        <select id="q-period">
+          <option value="">전체</option>
+          {PERIOD_STATES.map((s) => <option value={s}>{s}</option>)}
+        </select>
+      </div>
+      <div>
+        <label for="q-evidence">증빙 종류</label>
         <select id="q-evidence">
           <option value="">전체</option>
           {EVIDENCE_TYPES.map((t) => <option value={t}>{t}</option>)}
         </select>
       </div>
+      <div>
+        <label for="q-estate">수취 상태</label>
+        <select id="q-estate">
+          <option value="">전체</option>
+          {EVIDENCE_STATES.map((s) => <option value={s}>{s}</option>)}
+        </select>
+      </div>
+      <div>
+        <label for="q-submit">제출 상태</label>
+        <select id="q-submit">
+          <option value="">전체</option>
+          {SUBMIT_STATES.map((s) => <option value={s}>{s}</option>)}
+        </select>
+      </div>
       <div style="flex:2 1 200px">
-        <label for="q-text">거래처·메모 검색</label>
+        <label for="q-text">거래처·비목·메모 검색</label>
         <input type="search" id="q-text" placeholder="예: 택배" />
       </div>
       <div class="shrink">
@@ -86,25 +137,50 @@ const today = new Date().toISOString().slice(0, 10);
     </div>
 
     <dl data-summary style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.8rem;margin:0 0 1rem">
-      <div><dt class="small muted">총 지출</dt><dd data-sum-total style="margin:0;font-size:1.3rem;font-weight:800">-</dd></div>
+      <div><dt class="small muted">총 집행액</dt><dd data-sum-total style="margin:0;font-size:1.3rem;font-weight:800">-</dd></div>
       <div><dt class="small muted">입력 건수</dt><dd data-sum-count style="margin:0;font-size:1.3rem;font-weight:800">-</dd></div>
-      <div><dt class="small muted">정규 증빙으로 표시한 금액</dt><dd data-sum-regular style="margin:0;font-size:1.3rem;font-weight:800">-</dd></div>
-      <div><dt class="small muted">증빙 없음</dt><dd data-sum-missing style="margin:0;font-size:1.3rem;font-weight:800">-</dd></div>
+      <div><dt class="small muted">전용카드로 결제</dt><dd data-sum-dedicated style="margin:0;font-size:1.3rem;font-weight:800">-</dd></div>
+      <div><dt class="small muted">수취구멍(미수취·재요청)</dt><dd data-sum-gap style="margin:0;font-size:1.3rem;font-weight:800">-</dd></div>
+      <div><dt class="small muted">기간 리스크(기간 외·확인 필요)</dt><dd data-sum-period style="margin:0;font-size:1.3rem;font-weight:800">-</dd></div>
+      <div><dt class="small muted">제출 전</dt><dd data-sum-unsent style="margin:0;font-size:1.3rem;font-weight:800">-</dd></div>
     </dl>
 
     <div class="table-scroll">
       <table>
-        <caption class="small muted" style="text-align:left;caption-side:top">분류별 합계</caption>
-        <thead><tr><th scope="col">분류</th><th scope="col">건수</th><th scope="col">금액</th></tr></thead>
-        <tbody data-by-category><tr><td colspan="3" class="muted">자료가 없습니다</td></tr></tbody>
+        <caption class="small muted" style="text-align:left;caption-side:top">비목(예산과목)별 합계</caption>
+        <thead><tr><th scope="col">비목</th><th scope="col">건수</th><th scope="col">금액</th></tr></thead>
+        <tbody data-by-budget><tr><td colspan="3" class="muted">자료가 없습니다</td></tr></tbody>
       </table>
     </div>
 
     <div class="table-scroll">
       <table>
-        <caption class="small muted" style="text-align:left;caption-side:top">월별 합계</caption>
+        <caption class="small muted" style="text-align:left;caption-side:top">증빙 종류별 합계</caption>
+        <thead><tr><th scope="col">증빙 종류</th><th scope="col">건수</th><th scope="col">금액</th></tr></thead>
+        <tbody data-by-evidence><tr><td colspan="3" class="muted">자료가 없습니다</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <caption class="small muted" style="text-align:left;caption-side:top">월별 집행액</caption>
         <thead><tr><th scope="col">월</th><th scope="col">건수</th><th scope="col">금액</th></tr></thead>
         <tbody data-by-month><tr><td colspan="3" class="muted">자료가 없습니다</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card no-print" style="margin-bottom:1.2rem" data-gap-card hidden>
+    <h2 style="margin-top:0;font-size:1.05rem;border:0;padding:0">재요청이 필요한 건 <span class="muted small">(수취 못 한 순서대로)</span></h2>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">지출일</th><th scope="col">거래처</th><th scope="col">금액</th>
+            <th scope="col">비목</th><th scope="col">수취 상태</th><th scope="col">메모</th>
+          </tr>
+        </thead>
+        <tbody data-gap-rows></tbody>
       </table>
     </div>
   </div>
@@ -115,14 +191,15 @@ const today = new Date().toISOString().slice(0, 10);
       <table>
         <thead>
           <tr>
-            <th scope="col">날짜</th><th scope="col">거래처</th><th scope="col">금액</th>
-            <th scope="col">결제</th><th scope="col">증빙</th><th scope="col">분류</th>
+            <th scope="col">지출일</th><th scope="col">거래처</th><th scope="col">금액</th>
+            <th scope="col">비목</th><th scope="col">결제경로</th><th scope="col">집행 기간</th>
+            <th scope="col">증빙 종류</th><th scope="col">수취</th><th scope="col">제출</th>
             <th scope="col">메모</th><th scope="col" class="no-print"><span aria-hidden="true">지우기</span></th>
           </tr>
         </thead>
-        <tbody data-rows><tr><td colspan="8" class="muted">아직 입력이 없습니다.</td></tr></tbody>
+        <tbody data-rows><tr><td colspan="11" class="muted">아직 입력이 없습니다.</td></tr></tbody>
         <tfoot data-foot hidden>
-          <tr><th scope="row">합계</th><td></td><td data-foot-amount></td><td colspan="5"></td></tr>
+          <tr><th scope="row">합계</th><td></td><td data-foot-amount></td><td colspan="8"></td></tr>
         </tfoot>
       </table>
     </div>
@@ -150,6 +227,7 @@ const today = new Date().toISOString().slice(0, 10);
     computeTotals,
     csvFileName,
     currentPeriod,
+    evidenceGapList,
     filterEntries,
     formatKRW,
     makeId,
@@ -158,19 +236,35 @@ const today = new Date().toISOString().slice(0, 10);
     type Filters,
     type ReceiptEntry
   } from '../lib/receipts';
-  import { backupFileName, emptyState, loadState, saveState, serializeState, parseBackup, clearState } from '../lib/storage';
+  import {
+    backupFileName,
+    clearState,
+    emptyState,
+    loadState,
+    parseBackup,
+    saveState,
+    serializeState
+  } from '../lib/storage';
 
   const root = document.querySelector<HTMLElement>('[data-tool]');
 
   if (root) {
-    const el = (name: string): HTMLElement | null => root.querySelector(`[data-${name}]`);
-    const val = (id: string) => (document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null)?.value ?? '';
+    const el = (name: string): HTMLElement | null => root.querySelector<HTMLElement>(`[data-${name}]`);
+    const input = <T extends HTMLElement>(id: string) => document.getElementById(id) as T | null;
+    const val = (id: string) => input<HTMLInputElement | HTMLSelectElement>(id)?.value ?? '';
     const rowsBody = el('rows');
+    const gapBody = el('gap-rows');
+    const gapCard = el('gap-card');
     const foot = el('foot');
     const footAmount = el('foot-amount');
     const status = el('status');
     const formMsg = el('form-msg');
     const warning = el('storage-warning');
+
+    const FILTER_IDS = ['q-from', 'q-to', 'q-budget', 'q-pay', 'q-period', 'q-evidence', 'q-estate', 'q-submit', 'q-text'];
+    const SUGGESTED = new Set(
+      Array.from(document.querySelectorAll('#budget-list option')).map((o) => (o as HTMLOptionElement).value)
+    );
 
     let state = loadState();
     let filters: Filters = {};
@@ -198,9 +292,40 @@ const today = new Date().toISOString().slice(0, 10);
       return td;
     }
 
+    function emptyRow(colSpan: number, text: string): HTMLElement {
+      const tr = document.createElement('tr');
+      const td = document.createElement('td');
+      td.colSpan = colSpan;
+      td.className = 'muted';
+      td.textContent = text;
+      tr.appendChild(td);
+      return tr;
+    }
+
+    /** 비목 필터는 예시 목록에 없던 실제 입력값도 드롭다운에 쌓이도록 갱신합니다. */
+    function syncBudgetOptions(items: ReceiptEntry[], keep: string) {
+      const select = input<HTMLSelectElement>('q-budget');
+      if (!select) return;
+      const needed = new Set(items.map((e) => e.budgetItem).filter((b) => !SUGGESTED.has(b)));
+      for (const opt of Array.from(select.options)) {
+        const v = opt.value;
+        if (v && v !== '' && !SUGGESTED.has(v) && !needed.has(v)) select.removeOption(v);
+      }
+      const present = new Set(Array.from(select.options).map((o) => o.value));
+      for (const key of [...needed].sort((a, b) => a.localeCompare(b, 'ko'))) {
+        if (present.has(key)) continue;
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.textContent = key;
+        select.appendChild(opt);
+      }
+      select.value = keep;
+    }
+
     function render() {
       const list = filterEntries(state.entries, filters);
       const totals = computeTotals(list);
+      const gaps = evidenceGapList(list);
 
       const sum = (name: string, text: string) => {
         const node = el(name);
@@ -208,21 +333,17 @@ const today = new Date().toISOString().slice(0, 10);
       };
       sum('sum-total', formatKRW(totals.total));
       sum('sum-count', `${totals.count}건`);
-      sum('sum-regular', `${formatKRW(totals.regularTotal)} (${totals.regularRate}%)`);
-      sum('sum-missing', `${totals.missingEvidence}건`);
+      sum('sum-dedicated', `${formatKRW(totals.dedicatedTotal)} (${totals.dedicatedRate}%)`);
+      sum('sum-gap', `${totals.evidenceGapCount}건 · ${formatKRW(totals.evidenceGapTotal)}`);
+      sum('sum-period', `${totals.periodRiskCount}건 · ${formatKRW(totals.periodRiskTotal)}`);
+      sum('sum-unsent', `${totals.notSubmittedCount}건 · ${formatKRW(totals.notSubmittedTotal)}`);
 
       const fillGroup = (name: string, groups: { key: string; count: number; total: number }[]) => {
         const tbody = el(name);
         if (!tbody) return;
         tbody.textContent = '';
         if (groups.length === 0) {
-          const tr = document.createElement('tr');
-          const td = document.createElement('td');
-          td.colSpan = 3;
-          td.className = 'muted';
-          td.textContent = '자료가 없습니다';
-          tr.appendChild(td);
-          tbody.appendChild(tr);
+          tbody.appendChild(emptyRow(3, '자료가 없습니다'));
           return;
         }
         for (const g of groups) {
@@ -236,33 +357,46 @@ const today = new Date().toISOString().slice(0, 10);
           tbody.appendChild(tr);
         }
       };
-      fillGroup('by-category', totals.byCategory);
+      fillGroup('by-budget', totals.byBudgetItem);
+      fillGroup('by-evidence', totals.byEvidenceType);
       fillGroup('by-month', totals.byMonth);
+
+      if (gapCard && gapBody) {
+        gapCard.hidden = gaps.length === 0;
+        gapBody.textContent = '';
+        for (const e of gaps.slice(0, 30)) {
+          const tr = document.createElement('tr');
+          tr.appendChild(cell(e.date));
+          tr.appendChild(cell(e.vendor || '-'));
+          tr.appendChild(cell(formatKRW(e.amount), true));
+          tr.appendChild(cell(e.budgetItem));
+          tr.appendChild(cell(e.evidenceState));
+          tr.appendChild(cell(e.memo || '-'));
+          gapBody.appendChild(tr);
+        }
+      }
 
       if (rowsBody) {
         rowsBody.textContent = '';
         if (list.length === 0) {
-          const tr = document.createElement('tr');
-          const td = document.createElement('td');
-          td.colSpan = 8;
-          td.className = 'muted';
-          td.textContent = '조건에 맞는 입력이 없습니다.';
-          tr.appendChild(td);
-          rowsBody.appendChild(tr);
+          rowsBody.appendChild(emptyRow(11, '조건에 맞는 입력이 없습니다.'));
         }
         for (const e of list) {
           const tr = document.createElement('tr');
           tr.appendChild(cell(e.date));
           tr.appendChild(cell(e.vendor || '-'));
           tr.appendChild(cell(formatKRW(e.amount)));
+          tr.appendChild(cell(e.budgetItem));
           tr.appendChild(cell(e.payMethod));
+          tr.appendChild(cell(e.periodState));
           tr.appendChild(cell(e.evidenceType));
-          tr.appendChild(cell(e.category));
-          tr.appendChild(cell(e.memo));
+          tr.appendChild(cell(e.evidenceState));
+          tr.appendChild(cell(e.submitState));
+          tr.appendChild(cell(e.memo || '-'));
           const td = document.createElement('td');
           const btn = document.createElement('button');
           btn.type = 'button';
-          btn.className = 'btn ghost small';
+          btn.className = 'btn ghost small no-print';
           btn.textContent = '지우기';
           btn.dataset.id = e.id;
           btn.addEventListener('click', () => remove(e.id));
@@ -275,6 +409,7 @@ const today = new Date().toISOString().slice(0, 10);
         foot.hidden = list.length === 0;
         footAmount.textContent = formatKRW(totals.total);
       }
+      syncBudgetOptions(state.entries, val('q-budget'));
       if (status) {
         status.textContent = `전체 ${state.entries.length}건 중 ${list.length}건 표시 · 데이터는 이 브라우저에만 저장됩니다`;
       }
@@ -300,23 +435,28 @@ const today = new Date().toISOString().slice(0, 10);
         date: field('f-date'),
         vendor: field('f-vendor'),
         amount: Number(field('f-amount')),
+        budgetItem: field('f-budget'),
         payMethod: val('f-pay'),
+        periodState: val('f-period'),
         evidenceType: val('f-evidence'),
-        category: val('f-category'),
+        evidenceState: val('f-estate'),
+        submitState: val('f-submit'),
         memo: field('f-memo')
       });
       if (!entry) {
-        if (formMsg) formMsg.textContent = '날짜와 0 이상의 금액이 필요합니다.';
+        if (formMsg) formMsg.textContent = '지출일과 0 이상의 금액이 필요합니다.';
         return;
       }
       state.entries.push(entry);
       state.entries.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
       persist();
       render();
-      if (formMsg) formMsg.textContent = `${entry.date} · ${entry.vendor || '이름 없음'} ${formatKRW(entry.amount)} 추가됨`;
-      const vendor = document.getElementById('f-vendor') as HTMLInputElement | null;
-      const amount = document.getElementById('f-amount') as HTMLInputElement | null;
-      const memo = document.getElementById('f-memo') as HTMLInputElement | null;
+      if (formMsg) {
+        formMsg.textContent = `${entry.date} · ${entry.vendor || '이름 없음'} ${formatKRW(entry.amount)} · ${entry.budgetItem} 추가됨`;
+      }
+      const vendor = input<HTMLInputElement>('f-vendor');
+      const amount = input<HTMLInputElement>('f-amount');
+      const memo = input<HTMLInputElement>('f-memo');
       if (vendor) vendor.value = '';
       if (amount) amount.value = '';
       if (memo) memo.value = '';
@@ -329,20 +469,24 @@ const today = new Date().toISOString().slice(0, 10);
       filters = {
         from: field('q-from') || undefined,
         to: field('q-to') || undefined,
-        category: val('q-category') || undefined,
+        budgetItem: val('q-budget') || undefined,
+        payMethod: val('q-pay') || undefined,
+        periodState: val('q-period') || undefined,
         evidenceType: val('q-evidence') || undefined,
+        evidenceState: val('q-estate') || undefined,
+        submitState: val('q-submit') || undefined,
         q: field('q-text') || undefined
       };
       render();
     };
-    for (const id of ['q-from', 'q-to', 'q-category', 'q-evidence', 'q-text']) {
+    for (const id of FILTER_IDS) {
       const node = document.getElementById(id);
       node?.addEventListener('change', syncFilters);
       if (node instanceof HTMLInputElement && node.type === 'search') node.addEventListener('input', syncFilters);
     }
     el('reset-filters')?.addEventListener('click', () => {
-      for (const id of ['q-from', 'q-to', 'q-category', 'q-evidence', 'q-text']) {
-        const node = document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null;
+      for (const id of FILTER_IDS) {
+        const node = input<HTMLInputElement | HTMLSelectElement>(id);
         if (node) node.value = '';
       }
       filters = {};
@@ -363,7 +507,7 @@ const today = new Date().toISOString().slice(0, 10);
       download(backupFileName(), serializeState(state), 'application/json;charset=utf-8');
     });
 
-    const fileInput = document.getElementById('import-file') as HTMLInputElement | null;
+    const fileInput = input<HTMLInputElement>('import-file');
     fileInput?.addEventListener('change', () => {
       const file = fileInput.files?.[0];
       if (!file) return;
@@ -376,6 +520,7 @@ const today = new Date().toISOString().slice(0, 10);
         }
         if (!confirm(`${restored.entries.length}건을 복원합니다. 현재 목록(${state.entries.length}건)은 대체됩니다.`)) return;
         state = restored;
+        filters = {};
         persist();
         render();
         if (status) status.textContent = dropped > 0 ? `복원 완료 · 형식 오류 ${dropped}건은 건너뛰었습니다` : '복원 완료';
@@ -389,6 +534,7 @@ const today = new Date().toISOString().slice(0, 10);
       if (!confirm('이 브라우저에 저장된 지출 목록을 모두 지웁니다. 되돌릴 수 없습니다. 계속할까요?')) return;
       clearState();
       state = emptyState();
+      filters = {};
       render();
       if (status) status.textContent = '저장된 지출 목록을 비웠습니다.';
     });

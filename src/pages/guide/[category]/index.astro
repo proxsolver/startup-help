@@ -1,5 +1,5 @@
 ---
-import { getCollection, render } from 'astro:content';
+import { getCollection } from 'astro:content';
 import Base from '../../../layouts/Base.astro';
 import { CATEGORY_META, categoryDesc } from '../../../data/categories';
 import { p } from '../../../lib/url';
@@ -12,7 +12,6 @@ const { category } = Astro.params as { category: string };
 const guides = (await getCollection('guides', (entry) => entry.data.category === category)).sort(
   (a, b) => a.data.order - b.data.order || a.data.title.localeCompare(b.data.title)
 );
-const title = `${categoryDesc(category)} — ${CATEGORY_META.find((c) => c.key === category)?.title ?? category}`;
 ---
 
 <Base title={CATEGORY_META.find((c) => c.key === category)?.title ?? category} description={categoryDesc(category)} path={`/guide/${category}/`}>
@@ -39,8 +38,8 @@ const title = `${categoryDesc(category)} — ${CATEGORY_META.find((c) => c.key =
   }
 
   <p style="margin-top:2rem">
-    <a href={p('/tools/receipts/')}>영수증 정리 도구</a> ·
+    <a href={p('/tools/receipts/')}>집행 정리 도구</a> ·
     <a href={p('/tools/checklist/')}>체크리스트</a> ·
-    <a href={p('/calendar/')}>신고 일정</a>
+    <a href={p('/calendar/')}>정산·제출 일정</a>
   </p>
 </Base>

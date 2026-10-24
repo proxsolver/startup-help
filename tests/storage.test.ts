@@ -50,11 +50,13 @@ describe('normalizeState', () => {
         { date: '2026-03-02', vendor: 'B', amount: -1 },
         { date: 'bad', vendor: 'C', amount: 5 }
       ],
-      checklist: { 'pre-01': true, 'pre-02': 'yes', n: 3 }
+      checklist: { 'setup-01': true, 'setup-02': 'yes', n: 3 }
     });
     expect(state.entries).toHaveLength(1);
+    expect(state.entries[0].budgetItem).toBe('기타');
+    expect(state.entries[0].submitState).toBe('미제출');
     expect(dropped).toBe(2);
-    expect(state.checklist).toEqual({ 'pre-01': true });
+    expect(state.checklist).toEqual({ 'setup-01': true });
   });
 
   it('lastExportAt 문자열과 스키마 버전을 보존한다', () => {
@@ -72,12 +74,56 @@ describe('saveState / loadState 왕복', () => {
 
   it('저장 후 읽어온다', () => {
     const state = emptyState();
-    state.entries.push({ id: 'a', date: '2026-03-01', vendor: 'A', amount: 5000, payMethod: '현금', evidenceType: '현금영수증', category: '기타', memo: '' });
-    state.checklist['pre-01'] = true;
+    state.entries.push({
+      id: 'a',
+      date: '2026-03-01',
+      vendor: 'A',
+      amount: 5000,
+      budgetItem: '재료비',
+      payMethod: '현금',
+      evidenceType: '현금영수증',
+      evidenceState: '원본 확보',
+      periodState: '기간 내',
+      submitState: '미제출',
+      memo: ''
+    });
+    state.checklist['setup-01'] = true;
     expect(saveState(state, storage)).toBe(true);
     const back = loadState(storage);
     expect(back.entries[0].vendor).toBe('A');
-    expect(back.checklist['pre-01']).toBe(true);
+    expect(back.entries[0].budgetItem).toBe('재료비');
+    expect(back.checklist['setup-01']).toBe(true);
+  });
+
+  it('v1 형태로 저장되어 있던 데이터도 읽어올 때 v2 로 승격된다', () => {
+    const v1 = JSON.stringify({
+      schemaVersion: 1,
+      entries: [
+        {
+          id: 'old1',
+          date: '2026-02-11',
+          vendor: '예전 거래처',
+          amount: 30000,
+          payMethod: '카드',
+          evidenceType: '신용카드매출전표',
+          regularEvidence: true,
+          category: '매입·원재료',
+          memo: '예전 메모'
+        }
+      ],
+      checklist: { 'm1-01': true }
+    });
+    storage.setItem(STORAGE_KEY, v1);
+    const back = loadState(storage);
+    expect(back.entries).toHaveLength(1);
+    expect(back.entries[0].budgetItem).toBe('매입·원재료');
+    expect(back.entries[0].payMethod).toBe('확인 필요');
+    expect(back.entries[0].evidenceType).toBe('카드전표(매출전표)');
+    expect(back.entries[0].evidenceState).toBe('원본 확보');
+    expect(back.entries[0].periodState).toBe('확인 필요');
+    expect(back.entries[0].submitState).toBe('미제출');
+    expect(back.schemaVersion).toBe(SCHEMA_VERSION);
+    expect(back.checklist['m1-01']).toBe(true);
   });
 
   it('저장 실패(시크릿 모드·용량 초과)를 false 로 알려준다', () => {
@@ -110,10 +156,24 @@ describe('saveState / loadState 왕복', () => {
 describe('백업 파일 형식', () => {
   it('serialize → parse 왕복', () => {
     const state = emptyState();
-    state.entries.push({ id: 'z', date: '2026-01-09', vendor: '택배', amount: 3000, payMethod: '계좌이체', evidenceType: '없음', category: '교통·출장', memo: '샘플' });
+    state.entries.push({
+      id: 'z',
+      date: '2026-01-09',
+      vendor: '택배',
+      amount: 3000,
+      budgetItem: '출장·교통',
+      payMethod: '계좌이체',
+      evidenceType: '없음',
+      evidenceState: '미수취',
+      periodState: '확인 필요',
+      submitState: '초안 포함',
+      memo: '샘플'
+    });
     const { state: restored, dropped } = parseBackup(serializeState(state));
     expect(dropped).toBe(0);
     expect(restored.entries[0].memo).toBe('샘플');
+    expect(restored.entries[0].budgetItem).toBe('출장·교통');
+    expect(restored.entries[0].submitState).toBe('초안 포함');
     expect(restored.schemaVersion).toBe(SCHEMA_VERSION);
   });
 

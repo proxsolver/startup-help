@@ -14,7 +14,7 @@ interface Props {
 const { title, path = '' } = Astro.props;
 const description =
   Astro.props.description ??
-  '영수증·지출증빙 정리와 창업에 필요한 문서를 한 곳에서. 창업자를 위한 안내와 브라우저에서 도는 정리 도구.';
+  '지원사업 참여자의 사업비 집행·지출증빙·정산 보고를 정리하는 비공식 안내와 브라우저 전용 도구. 입력 내용은 서버로 전송되지 않습니다.';
 const canonical = absoluteUrl(Astro.site, path || Astro.url.pathname);
 ---
 

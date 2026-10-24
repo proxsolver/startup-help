@@ -2,7 +2,8 @@
 import { getCollection } from 'astro:content';
 import Base from '../layouts/Base.astro';
 import { p } from '../lib/url';
-import { pendingCount } from '../data/taxFacts';
+import { pendingCount } from '../data/schedule';
+import { CATEGORY_META } from '../data/categories';
 
 const guides = (await getCollection('guides')).sort(
   (a, b) =>
@@ -11,49 +12,69 @@ const guides = (await getCollection('guides')).sort(
     a.data.title.localeCompare(b.data.title)
 );
 
-const categories = [
-  { key: 'receipts', title: '영수증·지출증빙', desc: '무엇을 받아야 하고, 어떻게 정리하는지' },
-  { key: 'documents', title: '창업 문서', desc: '사업자등록·인허가·4대보험·서식 발급 창구' },
-  { key: 'tax', title: '신고 준비', desc: '캘린더를 읽고 자료 준비 순서' },
-  { key: 'launch', title: '개업 초기', desc: '첫 90일 배치' }
-] as const;
-
 const pendingGuides = guides.filter((g) => g.data.verification === 'pending').length;
-const pendingTax = pendingCount();
+const pendingSchedule = pendingCount();
 const featured = guides.filter((g) => g.data.order <= 2).slice(0, 6);
 ---
 
 <Base
-  title="모두의 창업 도움 — 영수증 정리와 필수 문서 안내"
-  description="예비창업자와 초기 사업자를 위해 영수증·지출증빙 정리법, 창업 필수 문서, 신고 준비 순서를 안내합니다. 데이터는 서버에 전송하지 않습니다."
+  title="모두의 창업 정산 도우미 (비공식) — 집행·증빙·정산 정리"
+  description="지원사업 참여자가 사업비를 집행하고 정산·보고할 때 쓰는 비공식 안내와 브라우저 전용 집행 정리 도구. 영수증·증빙 종류, 제출 상태, 기간 리스크를 한 표로 봅니다."
   path="/"
 >
   <section style="padding:2.2rem 0 1.2rem">
-    <h1>영수증 정리와 창업 문서,<br />혼자서도 할 수 있게</h1>
+    <h1>사업비 집행, 증빙, 정산.<br />정산서 한 장으로 돌아오게 정리합니다</h1>
     <p class="measure" style="font-size:1.06rem">
-      사업자등록을 막 끝낸 사람에게 가장 먼저 무너지는 것은 장부가 아니라 <strong>영수증 정리</strong>입니다.
-      이 사이트는 (1) 어떤 증빙을 받아야 하는지 구분하는 안내, (2) 창업에 필요한 문서와 발급 창구,
-      (3) 신고 준비 순서, (4) 브라우저 안에서 도는 영수증 정리 도구를 제공합니다.
+      지원사업 참여자에게 가장 먼저 무너지는 것은 실적이가 아니라 <strong>지출증빙 대응</strong>입니다.
+      결제한 카드와 받은 서류가 다르고, 항목 이름이 서류마다 바뀌면 정산 마감 직전에 전체를 다시 뒤집니다.
+      이 사이트는 (1) 집행 전에 정해 두는 규칙, (2) 결제 경로별 수취 서류 구분, (3) 정산 꾸러미 묶는 순서,
+      (4) 브라우저 안에서만 도는 집행 정리 도구를 제공합니다.
     </p>
     <div class="row no-print" style="max-width:520px;margin-top:1.2rem">
-      <a class="btn" href={p('/tools/receipts/')} style="text-align:center;text-decoration:none">영수증 정리 도구 열기</a>
+      <a class="btn" href={p('/tools/receipts/')} style="text-align:center;text-decoration:none">집행 정리 도구 열기</a>
       <a class="btn ghost" href={p('/tools/checklist/')} style="text-align:center;text-decoration:none">체크리스트</a>
     </div>
   </section>
 
   <aside class="notice">
-    <strong>숫자(기한·한도·기준액)는 검증된 것만 게시합니다</strong>
-    이 사이트는 세무·법률 자문이 아니라 실무 안내입니다. 현재 안내 문서 {pendingGuides}건과 신고 항목 {pendingTax}건의
-    법적 수치가 1차 출처(국세청·홈택스·법령·정부24) 검증을 기다리고 있어 비워 두었습니다.
-    검증이 끝나는 대로 기한과 기준을 채우고, 각 문서 하단에 출처를 함께 표시합니다.
-    신고·경비 인정 여부는 반드시 관할 세무서 또는 세무사 확인이 필요합니다.
+    <strong>창업진흥원·중소벤처기업부 공식 안내가 아닙니다</strong>
+    「모두의 창업」은 중소벤처기업부·창업진흥원이 운영하는 지원사업이고, 공식 안내는
+    <a href="https://modoo.or.kr" rel="noopener noreferrer external" target="_blank">modoo.or.kr</a> 에서 합니다.
+    이 사이트는 참여자가 실무적으로 자료를 정리하기 위해 만든 <strong>비공식</strong> 도구·참고 메모이며,
+    사업 신청·자격·금액·제재에 대한 판단 근거가 되지 않습니다. 대상·서식·제출 시점은 반드시 담당 주관기관 공고와
+    협약서 기준으로 확인하세요.
   </aside>
+
+  <aside class="notice">
+    <strong>숫자(기한·한도·인정 범위)는 검증된 것만 게시합니다</strong>
+    현재 안내 문서 {pendingGuides}건과 정산·제출 항목 {pendingSchedule}건의 시점·기준 수치가 1차 출처 검증을
+    기다려 비워 두었습니다. 검증 전에는 추정치를 올리지 않고, 각 문서 하단에 확인 창구만 적습니다.
+    세무 처리 판단은 세무 대리인 확인이 필요합니다.
+  </aside>
+
+  <section>
+    <h2>흐름으로 보기</h2>
+    <div class="grid">
+      <article class="card">
+        <h3><a href={p('/guide/basics/')}>1 · 집행 전</a></h3>
+        <p>협약 기간, 비목 체계, 결제수단 확정. 돈을 쓰기 전에 정하면 되돌리기 어려운 항목만 모았습니다.</p>
+      </article>
+      <article class="card">
+        <h3><a href={p('/guide/expense/')}>2 · 지출 발생</a></h3>
+        <p>결제 경로별로 실제로 받을 수 있는 서류가 달라집니다. 못 받은 증빙을 되돌리는 절차도 여기에 있습니다.</p>
+      </article>
+      <article class="card">
+        <h3><a href={p('/guide/settlement/')}>3 · 정산·보고</a></h3>
+        <p>월 마감 → 수취구멍 점검 → 제출상태 갱신 → 보완 요구 처리 순서로 꾸러미를 묶습니다.</p>
+      </article>
+    </div>
+  </section>
 
   <section>
     <h2>문서로 찾기</h2>
     <div class="grid">
       {
-        categories.map((c) => (
+        CATEGORY_META.map((c) => (
           <article class="card">
             <h3>
               <a href={p(`/guide/${c.key}/`)}>{c.title}</a>
@@ -69,7 +90,7 @@ const featured = guides.filter((g) => g.data.order <= 2).slice(0, 6);
   </section>
 
   <section>
-    <h2>많이 찾는 순서대로</h2>
+    <h2>자주 찾는 순서대로</h2>
     <ul>
       {
         featured.map((g) => (
@@ -88,16 +109,16 @@ const featured = guides.filter((g) => g.data.order <= 2).slice(0, 6);
     <h2>도구</h2>
     <div class="grid">
       <article class="card">
-        <h3><a href={p('/tools/receipts/')}>영수증 정리 도구</a></h3>
-        <p>지출을 한 줄씩 넣고 분류·증빙 구분으로 집계합니다. CSV·JSON 내보내기 지원. 입력 내용은 이 브라우저를 벗어나지 않습니다.</p>
+        <h3><a href={p('/tools/receipts/')}>집행 정리 도구</a></h3>
+        <p>지출을 한 줄씩 넣고 비목·결제경로·증빙 종류·수취·제출 상태로 집계합니다. 전용카드 비율과 수취구멍 합계가 바로 보입니다. CSV·JSON 내보내기 지원, 입력 내용은 이 브라우저를 벗어나지 않습니다.</p>
       </article>
       <article class="card">
-        <h3><a href={p('/tools/checklist/')}>창업 체크리스트</a></h3>
-        <p>개업 전 · 첫 달 · 신고 준비 3단계로 나뉜 항목 목록. 진행률이 브라우저에 저장됩니다.</p>
+        <h3><a href={p('/tools/checklist/')}>참여자 체크리스트</a></h3>
+        <p>집행 전 확정 · 지출 때마다 · 정산 꾸러미 3단계 항목 목록. 진행률이 브라우저에 저장됩니다.</p>
       </article>
       <article class="card">
-        <h3><a href={p('/calendar/')}>신고 일정</a></h3>
-        <p>어떤 항목이 본인에게 해당되는지 걸러내는 화면. 기한은 검증된 것만 표시됩니다.</p>
+        <h3><a href={p('/calendar/')}>정산·제출 일정</a></h3>
+        <p>협약·집행·정산 각 단계에서 무엇을 챙기는지 걸러내는 화면. 시점은 검증된 것만 표시됩니다.</p>
       </article>
     </div>
   </section>

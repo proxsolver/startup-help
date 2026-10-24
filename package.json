@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "모두의 창업 도움 — 영수증·지출증빙과 필수 문서를 정리해주는 정적 사이트",
+  "description": "모두의 창업 정산 도우미 (비공식) — 지원사업 참여자의 집행·지출증빙·정산을 정리해주는 정적 사이트",
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",

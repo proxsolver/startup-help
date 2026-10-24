@@ -11,11 +11,12 @@ import { glob } from 'astro/loaders';
 const baseSchema = z.object({
   title: z.string(),
   summary: z.string(),
-  category: z.enum(['receipts', 'documents', 'tax', 'launch']),
+  category: z.enum(['basics', 'expense', 'settlement', 'documents']),
+  /** 참여자 관점의 단계. 문서가 어느 시점의 이야기인지 나타냅니다. */
   audience: z
-    .enum(['pre', 'sole', 'corp'])
+    .enum(['apply', 'execute', 'settle'])
     .array()
-    .default(['pre', 'sole']),
+    .default(['execute']),
   tags: z.string().array().default([]),
   order: z.number().default(99),
   updatedAt: z.coerce.date(),
