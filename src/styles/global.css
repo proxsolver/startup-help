@@ -485,6 +485,33 @@ input[type='number'] {
   text-decoration: line-through;
 }
 
+/* ---------- 3문 진단 ---------- */
+/* 전역 input 의 width:100% 가 라디오까지 잡아먹어 보기가 라벨 폭 전체(390px 실측 271px) 로 늘어납니다.
+   손끝이 닿는 대상은 라벨 줄 전체이므로 flex 로 묶고 컨트롤 크기만 되돌립니다(세로 44px 확보). */
+#diagnose fieldset {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.8rem 0.7rem;
+  margin: 0 0 0.9rem;
+}
+#diagnose label {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 44px;
+  padding: 0.3rem 0;
+  margin: 0;
+  cursor: pointer;
+}
+#diagnose input[type='radio'] {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--brand);
+}
+
 /* ---------- 푸터 ---------- */
 .site-footer {
   margin-top: 4rem;

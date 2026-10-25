@@ -80,6 +80,27 @@ for (const f of html) {
 
   const canonicals = text.match(/<link rel="canonical"/g) || [];
   if (canonicals.length !== 1) problems.push(`${rel}: canonical 이 ${canonicals.length}개 입니다(1개여야 합니다)`);
+  /**
+   * canonical 의 base 중복 부착 검사. 화면이 자체적으로 p() 를 거쳐 만든 경로를 Base 레이아웃에 넘기면
+   * 절대 URL 이 한 번 더 감싸서 /startup-help/startup-help/ 가 됩니다(실제로 /start/·/consult/ 에서 발생).
+   * 내부 링크는 resolve() 가 잡아도 canonical 은 잡지 못하므로 여기서 따로 봅니다.
+   */
+  const canonicalHref = /<link rel="canonical" href="([^"]*)"/.exec(text)?.[1] ?? '';
+  if (!canonicalHref) {
+    problems.push(`${rel}: canonical href 를 읽을 수 없습니다`);
+  } else {
+    const seg = base.replace(/^\/+|\/+$/g, '');
+    if (seg) {
+      const pathname = canonicalHref.replace(/^[a-z]+:\/\/[^/]+/i, '');
+      const needle = `/${seg}/`;
+      // split 은 앞뒤로 겹치는 조각을 삼켜버립니다('/startup-help//…' 는 split 만으로는 1 번으로 보입니다).
+      // 그래서 한 글자씩 밀면서 세어, /startup-help/startup-help/start/ 를 2 번으로 잡습니다.
+      let times = 0;
+      for (let at = pathname.indexOf(needle); at !== -1; at = pathname.indexOf(needle, at + 1)) times++;
+      if (times > 1)
+        problems.push(`${rel}: canonical 에 base 가 ${times}번 붙었습니다(한 번이어야 합니다) → ${canonicalHref}`);
+    }
+  }
 
   for (const m of text.matchAll(/(?:href|src)="([^"]+)"/g)) {
     const href = m[1];

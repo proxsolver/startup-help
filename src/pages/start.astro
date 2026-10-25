@@ -1,0 +1,126 @@
+---
+import Base from '../layouts/Base.astro';
+import { p } from '../lib/url';
+import { diagnosisSummary, nextSteps } from '../lib/diagnose';
+import Offer from '../components/Offer.astro';
+
+const preview = nextSteps({ stage: 'execute', block: 'evidence', have: 'none' });
+---
+
+<Base
+  title="3문 진단 · 지금 어디가 막혔나 (비공식)"
+  description="세 가지 질문에 고르면 이 사이트에 있는 문서와 도구 중 지금 손대야 할 순서로 묶어 보여 줍니다. 답변은 서버로 보내지 않고 이 브라우저에서만 계산합니다."
+  path="/start/"
+>
+  <h1>지금 어디가 막혔나요</h1>
+  <p class="measure">
+    세 가지만 고르면 됩니다. 이 사이트에 이미 있는 안내·도구 중에서 순서만 잡아 주는 페이지이고, 입력한 답은 서버로 가지 않습니다.
+    아래 결과 목록은 사이트의 인쇄용 서식을 그대로 따라 종이에 남습니다 — 고른 뒤 인쇄해서 달력·세무사·주관기관과의 대화에 가져가 보세요.
+  </p>
+
+  <form class="card no-print" id="diagnose" onsubmit="return false">
+    <fieldset>
+      <legend>1. 지금 단계</legend>
+      <label><input type="radio" name="stage" value="before" /> 아직 돈을 쓰기 전</label>
+      <label><input type="radio" name="stage" value="execute" checked /> 집행 중</label>
+      <label><input type="radio" name="stage" value="settle" /> 정산·보고가 코앞</label>
+    </fieldset>
+    <fieldset>
+      <legend>2. 막힌 곳</legend>
+      <label><input type="radio" name="block" value="evidence" checked /> 증빙이 안 모인다</label>
+      <label><input type="radio" name="block" value="deadline" /> 무엇을 언제 내야 하는지 모르겠다</label>
+      <label><input type="radio" name="block" value="amounts" /> 금액이 정리되지 않는다</label>
+      <label><input type="radio" name="block" value="format" /> 제출 형식·분량이 부담이다</label>
+    </fieldset>
+    <fieldset>
+      <legend>3. 손에 가진 것</legend>
+      <label><input type="radio" name="have" value="card" /> 카드전표 위주</label>
+      <label><input type="radio" name="have" value="mixed" /> 현금·계좌이체가 섞였다</label>
+      <label><input type="radio" name="have" value="none" /> 아직 아무것도 없다</label>
+    </fieldset>
+  </form>
+
+  <section id="result" aria-live="polite">
+    <h2>권하는 순서</h2>
+    <p class="small muted" data-summary>{diagnosisSummary({ stage: 'execute', block: 'evidence', have: 'none' })}</p>
+    <ol class="diag-list" data-list>
+      {
+        preview.map((s) => (
+          <li>
+            <a href={p(s.href)}>{s.title}</a>
+            <span class="small muted"> — {s.why}</span>
+          </li>
+        ))
+      }
+    </ol>
+    <p class="small muted">
+      기본값(집행 중 · 증빙 · 아직 없음)으로 미리 보여 주는 결과입니다. 위 선택을 바꾸면 이 목록이 바로 달라집니다.
+    </p>
+  </section>
+
+  <hr />
+
+  <h2>네 가지 막힘으로 바로 고르기</h2>
+  <p class="small muted">선택이 번거로우면 이 목록에서 바로 들어가세요. 진단 결과와 같은 주소로 갑니다.</p>
+  <div class="grid">
+    <article class="card">
+      <h3><a href={p('/guide/expense/evidence-types/')}>증빙이 안 모일 때</a></h3>
+      <p>결제 경로별 받아 두는 서류와, 못 받은 증빙을 되돌리는 절차.</p>
+    </article>
+    <article class="card">
+      <h3><a href={p('/calendar/')}>제출 시점을 모를 때</a></h3>
+      <p>지원사업 요구와 세법 기한을 구분해 쌓아 둔 달력.</p>
+    </article>
+    <article class="card">
+      <h3><a href={p('/tools/receipts/')}>금액이 안 정리될 때</a></h3>
+      <p>브라우저에만 저장되는 집행 입력·집계 도구. 공백이 숫자로 나옵니다.</p>
+    </article>
+    <article class="card">
+      <h3><a href={p('/guide/settlement/settlement-package/')}>제출 형식이 부담될 때</a></h3>
+      <p>정산 꾸러미를 어떤 순서로 묶는지의 자체 정리 안내.</p>
+    </article>
+  </div>
+
+  <Offer variant="cta" />
+
+  <p class="notice">
+    <strong>이 페이지의 약속</strong>
+    추천 목록은 이 안에 있는 문서와 도구만 담습니다. 외부 서비스·가격·후기는 넣지 않고, 도움을 직접 맡기는 일은
+    <a href={p('/consult/')}>도움 요청 안내</a>에서 확인하세요.
+  </p>
+</Base>
+
+<script>
+  import { diagnosisSummary, nextSteps } from '../lib/diagnose';
+  import { p } from '../lib/url';
+
+  const form = document.getElementById('diagnose');
+  const list = document.querySelector<HTMLOListElement>('[data-list]');
+  const summary = document.querySelector<HTMLElement>('[data-summary]');
+
+  function val(name: string): string | null {
+    const checked = form instanceof HTMLFormElement ? form.querySelector<HTMLInputElement>(`input[name="${name}"]:checked`) : null;
+    return checked ? checked.value : null;
+  }
+
+  function redraw() {
+    if (!list) return;
+    const steps = nextSteps({ stage: val('stage'), block: val('block'), have: val('have') });
+    list.textContent = '';
+    for (const s of steps) {
+      const li = document.createElement('li');
+      const a = document.createElement('a');
+      a.href = p(s.href);
+      a.textContent = s.title;
+      const note = document.createElement('span');
+      note.className = 'small muted';
+      note.textContent = ` — ${s.why}`;
+      li.append(a, note);
+      list.appendChild(li);
+    }
+    if (summary) summary.textContent = diagnosisSummary({ stage: val('stage'), block: val('block'), have: val('have') });
+  }
+
+  form?.addEventListener('change', redraw);
+  redraw();
+</script>

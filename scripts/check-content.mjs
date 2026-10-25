@@ -19,6 +19,9 @@
  *      수치·조항을 적는 경우 그 자리에서 다시 확인할 수 있는 원문 링크(law·nts·hometax)와
  *      제N조 인용 시 국가법령정보센터 링크를 함께 요구한다. 링크가 이 사이트(self)뿐이면
  *      '자체 권장'임이 드러나 있는지 본다 — 기관 요구로 오해되면 안 됩니다.
+ *   9) 유료 제안(비즈니스 레이어, src/data/offer.ts)도 같은 규칙을 따릅니다 — status 를 'open' 으로 여는
+ *      순간 연락처·도움 범위·항목의 범위 경계(notFor)·게시 근거(basis)·수집 항목이 채워졌는지 확인하고
+ *      빈 칸이 있으면 빌드를 세웁니다. 'preparing' 은 화면에 상업 문구를 그리지 않는 상태라 통과합니다.
  *
  * 사용: node scripts/check-content.mjs   (npm run check:content)
  */
@@ -29,18 +32,44 @@ import { fileURLToPath } from 'node:url';
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const README = join(ROOT, 'README.md');
 const CONTENT = join(ROOT, 'src', 'content', 'guides');
-const STATIC_ROUTES = [
-  '/',
-  '/guide/',
-  '/calendar/',
-  '/tools/receipts/',
-  '/tools/checklist/',
-  '/about/',
-  '/privacy/',
-  '/terms/',
-  '/disclaimer/',
-  '/404/'
-];
+/**
+ * 실제 라우트 목록. 예전에는 손으로 적었습니다 — 그래서 새 페이지를 만들 때마다 목록에 한 줄을 빠뜨려
+ * 존재하는 주소가 '없는 링크' 로 잡히거나, 사라진 주소가 목록에 남아 통과하는 사고가 났습니다
+ * (리다이렉트 페이지 /guide/documents/shinhan-card-records/ 가 목록에 없던 것이 대표적인 예).
+ * 이제 src/pages 를 돌아서 만들고, 동적 세그먼트([category]·[slug]) 는 아래 콘텐츠·분류 데이터로 펴냅니다.
+ */
+/** @param {string} dir @param {string} prefix @param {Set<string>} out */
+function pageRoutes(dir, prefix, out) {
+  for (const name of readdirSync(dir)) {
+    const abs = join(dir, name);
+    if (statSync(abs).isDirectory()) {
+      if (name.startsWith('[')) continue;
+      pageRoutes(abs, `${prefix}${name}/`, out);
+      continue;
+    }
+    if (!/\.(astro|md)$/.test(name)) continue;
+    const stem = name.replace(/\.(astro|md)$/, '');
+    if (stem.startsWith('[')) continue;
+    out.add(stem === 'index' ? prefix : `${prefix}${stem}/`);
+  }
+}
+const PAGES = new Set();
+pageRoutes(join(ROOT, 'src', 'pages'), '/', PAGES);
+// 페이지 순회가 깨졌을 때 조용히 '없는 링크' 폭탄으로 번지지 않게, 핵심 주소는 여기서 확인합니다.
+for (const must of ['/', '/guide/', '/calendar/', '/tools/receipts/', '/tools/checklist/', '/start/', '/consult/', '/about/', '/privacy/', '/terms/', '/disclaimer/']) {
+  if (!PAGES.has(must)) {
+    console.error(`라우트 파싱 오류: ${must} 를 src/pages 에서 찾지 못했습니다 (검사 스크립트와 페이지 배치가 어긋남)`);
+    process.exit(1);
+  }
+}
+/**
+ * 내부 링크 검사 두 곳(문서 본문·코드) 이 각자 손으로 만든 주소 목록을 쓰면, 한 쪽에만 있는 접두는
+ * 그 쪽에서 조용히 통과합니다(예: /privacy/ 오타는 본문 검사를 지나 빌드 검사에서만 잡힘).
+ * 그래서 접두 목록도 실제 라우트에서 파생합니다 — 두 검사가 같은 집합을 봅니다.
+ */
+const LINK_ROOTS = [...new Set([...PAGES].map((r) => `/${r.split('/')[1]}`).filter((s) => s !== '/'))];
+/** @param {string} href @returns {boolean} */
+const isInternalLink = (href) => LINK_ROOTS.some((root) => href === root || href.startsWith(`${root}/`));
 
 /**
  * @param {string} dir
@@ -77,7 +106,7 @@ for (const f of files) {
 }
 const categoryRoutes = [...categoryKeys].map((c) => `/guide/${c}/`);
 
-const known = new Set([...STATIC_ROUTES, ...ids, ...categoryRoutes]);
+const known = new Set([...PAGES, ...ids, ...categoryRoutes]);
 
 const FORBIDDEN_WHILE_PENDING = [
   // 주의: 한국어는 JS 정규식에서 \w 가 아니라서 \b 를 붙이면 '원'·'일' 뒤에서 절대 매칭되지 않습니다.
@@ -210,7 +239,7 @@ for (const f of files) {
 
   for (const m of f.body.matchAll(/\]\((\/[^)\s]+)\)/g)) {
     const href = m[1];
-    if (!href.startsWith('/guide/') && !href.startsWith('/tools/') && !href.startsWith('/calendar/') && !href.startsWith('/about/')) continue;
+    if (!isInternalLink(href)) continue;
     const norm = href.endsWith('/') ? href : href + '/';
     if (!known.has(norm)) problems.push(`${rel}: 존재하지 않는 내부 링크 ${href}`);
   }
@@ -229,7 +258,10 @@ if (problems.length) {
  *    (문서 본문 밖의 링크 — checklists.ts 의 guide:, 컴포넌트의 href — 가 사라진 경로로 남는 사고 방지)
  *    설명용 예시(주석 안의 경로)와 템플릿 리터럴로 id 를 조립하는 곳은 판정할 수 없어 건너뜁니다.
  */
-const CODE_LINK = /["'`](\/(?:guide|tools|calendar|about|privacy|terms|disclaimer)\/[^"'`\n]*)["'`]/g;
+const CODE_LINK = new RegExp(
+  `["'\`](\\/(?:${LINK_ROOTS.map((r) => r.slice(1)).join('|')})/[^"'\`\n]*)["'\`]`,
+  'g'
+);
 const COMMENT_LINE = /^\s*(?:\/\/|\/\*|\*|\{\/\*|<!--)/;
 const CODE_FILE = /\.(astro|ts|tsx|js|mjs)$/;
 for (const file of walkText(join(ROOT, 'src'))) {
@@ -324,6 +356,72 @@ for (const block of ITEM_BLOCKS) {
     if (selfOnly && !/자체|권장/.test(block))
       problems.push(`schedule.ts ${id}: 이 사이트 링크만 걸어 두고 자체 권장임을 적지 않았습니다 — 기관 요구로 읽힐 수 있습니다`);
   }
+}
+
+/**
+ * 9) 비즈니스 레이어(src/data/offer.ts) 게이트.
+ *    유료 제안의 가격·회신 시간·실적·자격은 운영자만 아는 사실입니다. 제가 채울 수 없어서 필드를 비워 뒀고,
+ *    빈 값은 화면에도 나오지 않습니다. 그런데 status 만 'open' 으로 바꾸고 필드를 비워 두면
+ *    "문의하세요" 라고 써 놓고 받을 곳이 없는 페이지가 게시됩니다 — 이 사이트의 '근거 없는 진술 금지' 가
+ *    가장 아픈 방식으로 무너지는 지점이라, open 으로 여는 순간 필수 칸을 여기서 확인합니다.
+ *    (판정 로직 자체는 src/lib/offer.ts 에 있고, tests/offer.test.ts 가 같은 데이터를 대상으로 그 로직을 돌립니다)
+ */
+const OFFER_SRC = readFileSync(join(ROOT, 'src', 'data', 'offer.ts'), 'utf8');
+// 주석 안의 예시 값이 판정에 섞이지 않게 먼저 지웁니다.
+const offerCode = OFFER_SRC.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+/** 문자열 필드 하나를 읽습니다. 없으면 빈 문자열로 봅니다. */
+/** @param {RegExp} re @returns {string} */
+const offerStr = (re) => re.exec(offerCode)?.[1]?.trim() ?? '';
+const offerStatus = /status:\s*'([^']*)'/.exec(offerCode)?.[1] ?? '';
+if (offerStatus !== 'open' && offerStatus !== 'preparing') {
+  problems.push(`src/data/offer.ts: status 는 'open' 또는 'preparing' 이어야 합니다 → '${offerStatus}'`);
+}
+const contactBlock = /contact:\s*\{([\s\S]*?)\}/.exec(offerCode)?.[1] ?? '';
+const offerKind = /kind:\s*'([^']*)'/.exec(contactBlock)?.[1] ?? '';
+const offerValue = /value:\s*'([^']*)'/.exec(contactBlock)?.[1]?.trim() ?? '';
+// 창구 값은 준비 상태에서도 형식을 봅니다 — 열기 전에 틀린 주소를 잡아 두려면 필요합니다.
+if (offerValue !== '') {
+  // contactHref 는 접두어 없는 메일 주소도 받아들이므로, 게이트도 같은 관용을 씁니다(두 쪽이 다른 기준이면 약한 쪽이 먼저 통과합니다).
+  const mailAddress = offerValue.replace(/^mailto:/i, '');
+  if (offerKind === 'mailto' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mailAddress))
+    problems.push(`src/data/offer.ts contact.value: kind 가 mailto 인데 메일 주소 형식이 아닙니다 → ${offerValue}`);
+  if (offerKind === 'link' && !/^https:\/\/[^\s]+$/.test(offerValue))
+    problems.push(`src/data/offer.ts contact.value: kind 가 link 인데 https:// 주소가 아닙니다 → ${offerValue}`);
+  if (offerKind !== 'mailto' && offerKind !== 'link')
+    problems.push(`src/data/offer.ts contact.kind: 'mailto' 또는 'link' 만 쓸 수 있습니다 → '${offerKind}'`);
+}
+if (offerStatus === 'open') {
+  /** @param {string} label @param {string} value */
+  const requireField = (label, value) => {
+    if (value === '') problems.push(`src/data/offer.ts ${label}: open 상태에서는 빈 값으로 게시할 수 없습니다`);
+  };
+  requireField('who', offerStr(/who:\s*'([^']*)'/));
+  requireField('whoBasis', offerStr(/whoBasis:\s*'([^']*)'/));
+  requireField('scope', offerStr(/scope:\s*'([^']*)'/));
+  requireField('contact.value', offerValue);
+  const contactNote = /note:\s*'([^']*)'/.exec(contactBlock)?.[1]?.trim() ?? '';
+  if (contactNote !== '') requireField('contact.basis', /basis:\s*'([^']*)'/.exec(contactBlock)?.[1]?.trim() ?? '');
+  const serviceBlocks = /services:\s*\[([\s\S]*?)\n\s*\]/.exec(offerCode)?.[1]?.match(/\{[\s\S]*?\}/g) ?? [];
+  if (serviceBlocks.length === 0) problems.push('src/data/offer.ts services: open 상태인데 제안 항목이 없습니다');
+  for (const block of serviceBlocks) {
+    const id = /id:\s*'([^']*)'/.exec(block)?.[1]?.trim() || '(id 없음)';
+    for (const key of ['title', 'desc', 'notFor', 'basis']) {
+      const v = new RegExp(`\\b${key}:\\s*'([^']*)'`).exec(block)?.[1]?.trim() ?? '';
+      if (v === '')
+        problems.push(`src/data/offer.ts services ${id}.${key}: 빈 값이면 그 항목은 화면에 나오지 않습니다 — open 에서는 필수입니다`);
+    }
+  }
+  const privacyBlock = /privacy:\s*\{([\s\S]*?)\}/.exec(offerCode)?.[1] ?? '';
+  // 배열이 아예 없거나(['']), 공백만 들어 있거나('  '), 줄 자체가 삭제된 경우는 모두 실패로 봅니다.
+  const collectsRaw = /collects:\s*\[([\s\S]*?)\]/.exec(privacyBlock)?.[1] ?? '';
+  const collectsFilled = (collectsRaw.match(/'([^']*)'/g) ?? []).filter((s) => s.slice(1, -1).trim() !== '').length;
+  if (collectsFilled === 0)
+    problems.push(
+      'src/data/offer.ts privacy.collects: 창구를 열었으면 문의 때 받는 항목을 하나 이상 적으세요 (빈 배열·공백만 있으면 고지가 성립하지 않습니다)'
+    );
+  requireField('privacy.purpose', /purpose:\s*'([^']*)'/.exec(privacyBlock)?.[1]?.trim() ?? '');
+  requireField('privacy.retention', /retention:\s*'([^']*)'/.exec(privacyBlock)?.[1]?.trim() ?? '');
+  requireField('privacy.refusal', /refusal:\s*'([^']*)'/.exec(privacyBlock)?.[1]?.trim() ?? '');
 }
 if (problems.length) {
   console.error('콘텐츠 검사 실패:\n' + problems.map((p) => '  - ' + p).join('\n'));

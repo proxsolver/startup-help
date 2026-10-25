@@ -11,6 +11,9 @@ export function p(path: string): string {
     return path;
   }
   const clean = path.startsWith('/') ? path : `/${path}`;
+  // base 가 이미 붙은 값을 다시 받으면 /startup-help/startup-help/ 처럼 두 번 붙습니다(canonical 에서 실측).
+  // 링크와 절대 URL 이 같은 헬퍼를 쓰므로 여기서 한 번만 붙이도록 막습니다.
+  if (rawBase && (clean === rawBase || clean.startsWith(`${rawBase}/`))) return clean;
   return `${rawBase}${clean}`;
 }
 

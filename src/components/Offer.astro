@@ -1,0 +1,129 @@
+---
+/**
+ * 비즈니스 레이어 렌더링. `src/data/offer.ts` 가 `open` 이 아니고 게시 조건을 통과한 항목이 없으면
+ * 이 컴포넌트는 아무것도 그리지 않습니다 (placeholder 도, "준비 중" 광고도 보여 주지 않습니다).
+ *
+ * variant:
+ *  - 'cta'    : 아픈 지점(도구·안내 끝)에 붙는 한 줄 안내. 링크는 /consult/ 하나만.
+ *  - 'cards'  : /consult/ 의 항목 카드 (가격·범위 경계·근거를 함께 보여줍니다).
+ *  - 'contact': /consult/ 의 문의 창구 블록 + 개인정보 고지 요약.
+ */
+import { OFFER } from '../data/offer';
+import {
+  offerLive,
+  publishableServices,
+  contactHref,
+  contactPresentation,
+  priceText,
+  formLabel,
+  whoText,
+  privacyStatement
+} from '../lib/offer';
+import { p } from '../lib/url';
+
+type Variant = 'cta' | 'cards' | 'contact';
+interface Props {
+  variant?: Variant;
+}
+const { variant = 'cta' } = Astro.props as Props;
+
+const live = offerLive(OFFER);
+const services = publishableServices(OFFER);
+const href = contactHref(OFFER);
+const contact = contactPresentation(OFFER);
+const who = whoText(OFFER);
+const privacy = privacyStatement(OFFER);
+---
+
+{
+  live && variant === 'cta' ? (
+    <aside class="notice info offer-cta no-print">
+      <strong>정리를 대신 맡길 수 있습니다</strong>
+      <p class="small">
+        {who ? <>{who} · </> : null}
+        {OFFER.scope ? <>{OFFER.scope} · </> : null}무엇을 하고 무엇을 안 하는지{' '}
+        <a href={p('/consult/')}>도움 요청 안내</a>에 그대로 적어 두었습니다.
+      </p>
+    </aside>
+  ) : null
+}
+
+{
+  live && variant === 'cards' && services.length > 0 ? (
+    <div class="grid">
+      {services.map((s) => (
+        <article class="card offer-card" id={`offer-${s.id}`}>
+          <h3>{s.title}</h3>
+          <p>{s.desc}</p>
+          <p class="small muted">
+            형식: {formLabel(s.form)}
+            {/* 가격이 비어 있으면 '비용은 상담에서' 같은 대체 문구도 만들지 않습니다 — 채워지지 않은 진술은 그리지 않습니다. */}
+            {priceText(s) ? <> · 비용: {priceText(s)}</> : null}
+          </p>
+          <p class="small">
+            <strong>이 항목으로 해결되지 않는 일</strong>
+            <br />
+            {s.notFor}
+          </p>
+        </article>
+      ))}
+    </div>
+  ) : null
+}
+
+{
+  live && variant === 'contact' && href ? (
+    <section class="offer-contact">
+      <h2>문의하는 방법</h2>
+      <p class="measure">
+        <a class="btn" href={href} rel="noopener">
+          {contact.label}
+        </a>
+      </p>
+      {contact.note ? <p class="small muted">{contact.note}</p> : null}
+      {privacy ? (
+        <div class="notice">
+          <p class="small">
+            <strong>문의할 때 받는 정보</strong>
+            <br />
+            받는 항목: {privacy.collects.length > 0 ? privacy.collects.join(', ') : '없음'}
+            <br />
+            받는 이유: {privacy.purpose}
+            <br />
+            보관: {privacy.retention}
+            <br />
+            {
+              privacy.refusal ? (
+                <>
+                  동의 거부: {privacy.refusal}
+                  <br />
+                </>
+              ) : null
+            }
+            {privacy.processor
+              ? <>처리 위탁: {privacy.processor}</>
+              : <>처리 위탁은 아직 적히지 않았습니다 — 문의 창구로 들어온 내용을 어디에서 받고 읽는지는 운영자가 확인한 뒤에 이 자리에 표시됩니다.</>}
+            {
+              privacy.thirdParty ? (
+                <>
+                  <br />
+                  제3자 제공: {privacy.thirdParty}
+                </>
+              ) : (
+                <>
+                  <br />
+                  제3자 제공은 적히지 않았습니다. 위탁(맡기는 일)과 제3자 제공(남에게 넘기는 일)은 구분해 알려야 하므로,
+                  넘기는 일이 생기면 이 자리에 별도로 표시됩니다.
+                </>
+              )
+            }
+          </p>
+          <p class="small muted">
+            집행 정리 자료는 계속 이 브라우저에만 남습니다. 위 항목은 문의 창구를 통해 직접 보내는 내용에만 해당합니다. 전문은{' '}
+            <a href={p('/privacy/')}>개인정보 처리 기준</a>과 <a href={p('/terms/')}>이용 조건</a>에 있습니다.
+          </p>
+        </div>
+      ) : null}
+    </section>
+  ) : null
+}

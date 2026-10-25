@@ -1,16 +1,66 @@
 ---
 import Base from '../layouts/Base.astro';
 import { p } from '../lib/url';
+import { OFFER } from '../data/offer';
+import { contactHref, contactPresentation, offerLive, privacyStatement } from '../lib/offer';
+
+/**
+ * 이 페이지는 화면에 무엇이 보이는지와 늘 같은 말을 하도록 오퍼 데이터를 함께 읽습니다.
+ * 도움 창구를 닫아 둔 현재는 '수집 항목 없음' 이 사실이고, 창구를 열면(= 운영자가 privacy 를 채우면)
+ * 받는 항목·받는 이유·보유 기간·거부할 수 있다는 사실이 아래 1 번에 자동으로 들어갑니다. 빈 항목은 그리지 않습니다.
+ */
+const statement = privacyStatement(OFFER);
+const collects = statement ? statement.collects : [];
+const live = offerLive(OFFER);
+const contact = contactHref(OFFER);
+const contactInfo = contactPresentation(OFFER);
 ---
 
-<Base title="개인정보 처리방침" description="이 사이트가 개인정보를 다루는 방식: 수집 항목 없음, 브라우저 저장소만 사용." path="/privacy/">
+<Base
+  title="개인정보 처리방침"
+  description={collects.length > 0
+    ? '이 사이트가 개인정보를 다루는 방식: 문의 때 받는 항목과 목적·보유 기간, 브라우저 저장소만 쓰는 저장 구조.'
+    : '이 사이트가 개인정보를 다루는 방식: 수집 항목 없음, 브라우저 저장소만 사용.'}
+  path="/privacy/"
+>
   <h1>개인정보 처리방침</h1>
   <p class="muted small">시행일: 2026년 10월 24일</p>
 
-  <h2>1. 수집하는 개인정보가 없습니다</h2>
-  <p>
-    이 사이트는 정적 파일로만 서비스됩니다. 계정·가입 폼·결제·문의 폼이 없어 이름, 연락처, 사업자 정보를
-    서버로 보내는 경로가 없습니다. 전송받을 서버 자체가 운영 진영에 없습니다.
+  <h2>1. {collects.length > 0 ? '문의 때 받는 항목' : '수집하는 개인정보가 없습니다'}</h2>
+  {
+    collects.length > 0 ? (
+      <div>
+        <p class="measure">
+          도움 요청 창구가 열려 있습니다. 문의 때 받는 항목은 아래와 같습니다.
+        </p>
+        <ul>
+          {collects.map((c) => (
+            <li>{c}</li>
+          ))}
+        </ul>
+        {statement && statement.purpose ? <p>{statement.purpose}</p> : null}
+        {statement && statement.retention ? <p>보유·이용 기간: {statement.retention}</p> : null}
+        {statement && statement.refusal ? <p>동의 거부: {statement.refusal}</p> : null}
+        {statement && statement.processor ? <p>처리 위탁: {statement.processor}</p> : null}
+        {statement && statement.thirdParty ? <p>제3자 제공: {statement.thirdParty}</p> : null}
+        <p class="small muted">
+          창구를 열 때 비워 두면 빌드가 멈추는 네 칸은 이렇습니다 — <strong>받는 항목</strong>, <strong>받는 이유</strong>,
+          <strong>보유·이용 기간</strong>, <strong>거절할 수 있다는 사실</strong>. 위탁과 제3자 제공은 구분해서 따로 적습니다.
+          위 문장은 운영자가 채운 값(<code>src/data/offer.ts</code>) 을 그대로 보여 주는 것으로, 이 페이지와
+          <a href={p('/consult/')}>도움 요청 안내</a> 가 같은 출처를 씁니다. 값이 비면 이 자리에 아무것도 표시되지 않습니다.
+        </p>
+      </div>
+    ) : (
+      <p>
+        이 사이트는 정적 파일로만 서비스됩니다. 계정·가입 폼·결제·문의 폼이 없어 이름, 연락처, 사업자 정보를
+        서버로 보내는 경로가 없습니다. 전송받을 서버 자체가 운영 진영에 없습니다.
+        {live ? '' : ' 지금은 도움 요청 창구조차 열어 두지 않았습니다.'}
+      </p>
+    )
+  }
+  <p class="small muted">
+    나중에라도 문의 창구를 열어 항목을 받는다면, 받는 것·목적·보유 기간을 이 번호에 먼저 채워 넣습니다.
+    화면에 문의 링크가 뜨는데 이 페이지가 비어 있는 상태가 빌드에서 막히도록 만들어 두었습니다.
   </p>
 
   <h2>2. 거래 내역(집행 정리 도구)의 저장 위치</h2>
@@ -45,7 +95,16 @@ import { p } from '../lib/url';
   <h2>6. 문의</h2>
   <p>
     공개 저장소 issue 로 남겨 주세요: <a href="https://github.com/proxsolver/startup-help/issues">startup-help issues</a>.
-    개인 정보를 포함해 문의하지 말아 주세요 — 운영자가 읽을 수 없는 구조라 해결이 늦어집니다.
+    issue 는 모두에게 보이는 자리이므로 <strong>개인 정보·거래처 이름·원본 서류는 넣지 말아 주세요</strong>.
+    {
+      live && contact ? (
+        <span>
+          {' '}도움 요청은 <a href={contact}>{contactInfo.label}</a> 창구를 씁니다 — 위 1 번에 적힌 항목만 받습니다.
+        </span>
+      ) : (
+        <span> 지금은 도움 요청 창구를 열어 두지 않아, 정리된 문의가 도착할 메일·양식이 이 사이트에 없습니다.</span>
+      )
+    }
   </p>
 
   <p><a href={p('/terms/')}>이용약관</a> · <a href={p('/disclaimer/')}>정보 이용 안내</a></p>

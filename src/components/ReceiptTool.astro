@@ -220,6 +220,7 @@ const backupLimit = [
 
   <div class="row no-print" style="align-items:start">
     <div class="shrink"><button class="btn" type="button" data-export-csv>CSV 내보내기</button></div>
+    <div class="shrink"><button class="btn" type="button" data-export-bundle>정산 꾸러미 내보내기</button></div>
     <div class="shrink"><button class="btn ghost" type="button" data-export-json>JSON 백업</button></div>
     <div>
       <label for="import-file">JSON 복원</label>
@@ -227,6 +228,10 @@ const backupLimit = [
     </div>
     <div class="shrink"><button class="btn ghost" type="button" data-clear>지출 목록 비우기</button></div>
   </div>
+  <p class="small muted no-print" style="margin-top:.4rem">
+    <strong>정산 꾸러미</strong>는 지금 화면에 보이는 결과를 한 편으로 묶습니다 — 요약 · 증빙 공백 · 기간 리스크 · 제출 전 항목 · 비목/결제경로/월별 합계 · 체크리스트 남은 것, 그리고
+    담당 기관에 보낼 <strong>증빙 요청 메일 초안</strong>(기관명·사업명은 〔 〕 으로 비워 둡니다 — 제가 알 수 없는 값이라). 텍스트 파일 하나로 내려받아 메모장·메일·인쇄 어디에서든 씁니다.
+  </p>
   <p class="small muted no-print" style="margin-top:.4rem">
     <strong>지출 목록 비우기</strong>는 이 브라우저에 저장된 지출 항목만 삭제합니다. 체크리스트 확인 결과는 그대로 남습니다.
   </p>
@@ -255,6 +260,8 @@ const backupLimit = [
     type Filters,
     type ReceiptEntry
   } from '../lib/receipts';
+  import { buildBundle, bundleFileName, dataPeriod } from '../lib/bundle';
+  import { CHECKLIST } from '../data/checklists';
   import {
     backupFileName,
     clearEntries,
@@ -629,6 +636,35 @@ const backupLimit = [
 
     el('export-json')?.addEventListener('click', () => {
       download(backupFileName(), serializeState(state), 'application/json;charset=utf-8');
+    });
+
+    el('export-bundle')?.addEventListener('click', () => {
+      // CSV 와 같은 기준: 필터까지 적용된 화면 결과만 묶습니다. 숨은 행을 몰래 넣지 않습니다.
+      const visible = filterEntries(state.entries, filters);
+      if (visible.length === 0) {
+        if (status) {
+          status.textContent =
+            state.entries.length > 0
+              ? '필터 조건에 맞는 건이 없어 꾸러미를 만들 수 없습니다. 필터를 해제하거나 기간을 넓혀 주세요.'
+              : '지출 항목을 먼저 입력해 주세요.';
+        }
+        return;
+      }
+      // 기간 필터가 걸려 있으면 그 값대로, 없으면 이번 달을 적는 대신 실제로 들어 있는 집행 달을 기간으로 적습니다.
+      // (기관에 보내는 파일의 '기간' 칸이 데이터와 다른 달이면 오해가 됩니다)
+      const period = filters.from || filters.to ? exportPeriod(filters) : dataPeriod(visible);
+      const text = buildBundle({
+        entries: visible,
+        checklist: state.checklist,
+        items: CHECKLIST.flatMap((stage) => stage.items.map((i) => ({ id: i.id, label: i.label }))),
+        period,
+        generatedAt: new Date()
+      });
+      const name = bundleFileName(period);
+      download(name, text, 'text/plain;charset=utf-8');
+      state.lastExportAt = new Date().toISOString();
+      saveMeta({ lastExportAt: state.lastExportAt });
+      if (status) status.textContent = `${name} · ${visible.length}건으로 꾸러미 생성 (화면에 표시된 결과만, 브라우저 안에서 조립 — 전송 없음)`;
     });
 
     /** 필터 DOM 과 상태(filters)를 한 번에 초기화 — 두어가 어긋나는 창을 없앱니다. */

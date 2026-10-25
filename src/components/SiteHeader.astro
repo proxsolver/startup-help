@@ -7,10 +7,12 @@ const rel = here.startsWith(base) && base !== '' ? here.slice(base.length) || '/
 
 const links = [
   { to: '/', label: '홈' },
+  { to: '/start/', label: '3문 진단' },
   { to: '/guide/', label: '안내' },
   { to: '/calendar/', label: '정산·제출' },
   { to: '/tools/receipts/', label: '집행 정리' },
-  { to: '/tools/checklist/', label: '체크리스트' }
+  { to: '/tools/checklist/', label: '체크리스트' },
+  { to: '/consult/', label: '도움 요청' }
 ];
 
 function isCurrent(to: string): boolean {
