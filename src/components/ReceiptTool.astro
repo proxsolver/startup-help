@@ -180,6 +180,7 @@ const backupLimit = [
 
   <div class="card no-print" style="margin-bottom:1.2rem" data-gap-card hidden>
     <h2 style="margin-top:0;font-size:1.05rem;border:0;padding:0">재요청이 필요한 건 <span class="muted small">(수취 못 한 순서대로)</span></h2>
+    <p class="small muted scroll-hint no-print">열이 여섯 개입니다. 좁은 화면에서는 이 표를 좌우로 밀어 보세요.</p>
     <div class="table-scroll">
       <table>
         <thead>
@@ -195,6 +196,10 @@ const backupLimit = [
 
   <div class="card" style="margin-bottom:1.2rem">
     <h2 style="margin-top:0;font-size:1.05rem;border:0;padding:0">입력 목록 <span class="muted small">(필터 적용된 결과)</span></h2>
+    <p class="small muted scroll-hint no-print">
+      열이 열한 개(마지막은 지우기 버튼)입니다. 좁은 화면에서는 표를 좌우로 밀어 보세요.
+      인쇄에는 지우기 열이 들어가지 않고, CSV 에는 이 표의 값에 전용카드 여부 열이 하나 더 들어갑니다.
+    </p>
     <div class="table-scroll">
       <table>
         <thead>
@@ -456,6 +461,9 @@ const backupLimit = [
           tr.appendChild(cell(e.submitState));
           tr.appendChild(cell(e.memo || '-'));
           const td = document.createElement('td');
+          // 헤더의 지우기 열은 인쇄에서 숨기는데 이 칸을 남기면, 열 개수가 맞지 않아
+          // 인쇄 화면에 빈 열이 하나 더 생깁니다. 칸 자체도 인쇄에서 뺍니다.
+          td.className = 'no-print';
           const btn = document.createElement('button');
           btn.type = 'button';
           btn.className = 'btn ghost small no-print';

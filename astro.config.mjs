@@ -2,6 +2,7 @@
 import { defineConfig } from 'astro/config';
 
 import { prefixRootLinks } from './src/plugins/baseLinks.js';
+import { wrapTables } from './src/plugins/tableScroll.js';
 
 // GitHub Pages 프로젝트 사이트로 배포합니다.
 // 리포 이름이나 도메인이 바뀌면 아래 base / site 도 함께 고쳐야 합니다.
@@ -16,8 +17,9 @@ export default defineConfig({
   base: isLocal ? '/' : BASE,
   trailingSlash: 'ignore',
   markdown: {
-    // 본문 마크다운의 루트 절대경로 링크(/guide/...)에 배포 base 경로를 붙입니다.
-    rehypePlugins: [[prefixRootLinks, { base: isLocal ? '/' : BASE }]]
+    // 본문 마크다운의 루트 절대경로 링크(/guide/...)에 배포 base 경로를 붙이고,
+    // 표는 스크롤 컨테이너로 감쌉니다(좁은 화면에서 열이 찌그러지지 않게).
+    rehypePlugins: [[prefixRootLinks, { base: isLocal ? '/' : BASE }], wrapTables]
   },
   build: {
     inlineStylesheets: 'auto'
