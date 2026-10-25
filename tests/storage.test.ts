@@ -11,6 +11,7 @@ import {
   clearState,
   emptyState,
   getStorage,
+  hasCardSettings,
   isBackupFileTooLarge,
   isFutureSchema,
   loadState,
@@ -20,12 +21,14 @@ import {
   parseBackup,
   readStored,
   replaceEntries,
+  saveCardSettings,
   saveChecklist,
   saveEntries,
   saveMeta,
   saveState,
   serializeState
 } from '../src/lib/storage';
+import { emptyCardSettings, MAX_CARD_RULES, normalizeCardSettings, type CardSettings } from '../src/lib/cardimport';
 import { SCHEMA_VERSION, type ReceiptEntry } from '../src/lib/receipts';
 
 const entry = (id: string, date: string, over: Partial<ReceiptEntry> = {}): ReceiptEntry => ({
@@ -582,5 +585,106 @@ describe('삭제 기록 일관성 (백업·복원·상한)', () => {
     const failed = saveEntries([], ['a'], storage);
     expect(failed.ok).toBe(false);
     expect(failed.trimmed).toBe(0);
+  });
+});
+
+describe('카드사 명세서 수입 설정 (v4)', () => {
+  const settings = (over: Partial<CardSettings> = {}): CardSettings => ({
+    dedicatedCardTails: ['441'],
+    periodFrom: '2026-01-01',
+    periodTo: '2026-12-31',
+    budgetRules: [{ match: '원단', budgetItem: '재료비' }],
+    ...over
+  });
+
+  it('v3 저장본에는 없던 칸이라 빈 설정으로 승격된다 (추측값으로 채우지 않는다)', () => {
+    const storage = asStorage();
+    storage.setItem(STORAGE_KEY, JSON.stringify({ schemaVersion: 3, entries: [entry('a', '2026-03-01')] }));
+    const { state, dropped, future } = readStored(storage);
+    expect(future).toBe(false);
+    expect(dropped).toBe(0);
+    expect(state.cardSettings).toEqual(emptyCardSettings());
+    expect(state.entries).toHaveLength(1);
+  });
+
+  it('normalize: 개수·길이 상한, 빈 규칙·중복 끝번호, 날짜 모양이 다른 값은 미지정으로', () => {
+    const many = Array.from({ length: MAX_CARD_RULES + 5 }, (_, i) => ({ match: `g${i}`, budgetItem: `b${i}` }));
+    const res = normalizeCardSettings({
+      dedicatedCardTails: ['441', ' 441 ', '', 7 as unknown as string, '9'.repeat(40)],
+      periodFrom: '2026-1-1',
+      periodTo: '2026-12-31',
+      budgetRules: [...many, { match: '  ', budgetItem: 'x' }, { match: 'a' } as unknown as { match: string; budgetItem: string }]
+    });
+    expect(res.dedicatedCardTails[0]).toBe('441');
+    expect(res.dedicatedCardTails).toHaveLength(2); // '441' + 잘린 9 의 행렬
+    expect(res.dedicatedCardTails.every((t) => t.length <= 12)).toBe(true);
+    expect(res.budgetRules).toHaveLength(MAX_CARD_RULES);
+    expect(res.periodFrom).toBe(''); // 'YYYY-M-D' 는 입력란 값이 아니므로 미지정
+    expect(res.periodTo).toBe('2026-12-31');
+    for (const bad of [null, undefined, 'x', 12, [], {}]) expect(normalizeCardSettings(bad)).toEqual(emptyCardSettings());
+  });
+
+  it('왕복: 저장 → 백업 직렬화 → 복원 해석까지 같은 값으로 살아남는다', () => {
+    const storage = asStorage();
+    const next = saveCardSettings(settings(), storage);
+    expect(next.ok).toBe(true);
+    expect(loadState(storage).cardSettings).toEqual(settings());
+    const text = serializeState(loadState(storage));
+    const parsed = parseBackup(text);
+    expect(parsed.rejected).toBeNull();
+    expect(parsed.state!.cardSettings).toEqual(settings());
+  });
+
+  it('설정만 저장해도 지출 행과 체크리스트는 그대로다 (다른 탭 결과 안 잃음)', () => {
+    const storage = asStorage();
+    saveState({ ...emptyState(), entries: [entry('a', '2026-03-01')], checklist: { 'setup-01': true } }, storage);
+    saveCardSettings(settings({ periodTo: '' }), storage);
+    const after = loadState(storage);
+    expect(after.entries.map((e) => e.id)).toEqual(['a']);
+    expect(after.checklist).toEqual({ 'setup-01': true });
+    expect(after.cardSettings.periodTo).toBe('');
+  });
+
+  it('더 새로운 형식 저장본에는 설정도 쓰지 않는다 (강등 방지)', () => {
+    const storage = asStorage();
+    storage.setItem(STORAGE_KEY, JSON.stringify({ schemaVersion: SCHEMA_VERSION + 1, entries: [] }));
+    const res = saveCardSettings(settings(), storage);
+    expect(res.ok).toBe(false);
+    expect(res.future).toBe(true);
+    expect(JSON.parse(storage.getItem(STORAGE_KEY)!).schemaVersion).toBe(SCHEMA_VERSION + 1);
+  });
+
+  it('쓰기 실패(시크릿·용량 초과)는 false 로 알려 화면 경고가 꺼지지 않게 한다', () => {
+    const res = saveCardSettings(settings(), asStorage(true));
+    expect(res.ok).toBe(false);
+    expect(res.future).toBe(false);
+    expect(saveCardSettings(settings(), undefined).ok).toBe(false);
+  });
+
+  it('복원: 파일에 규칙이 있으면 그 값이 이 브라우저 설정을 대체한다', () => {
+    const storage = asStorage();
+    saveCardSettings(settings({ dedicatedCardTails: ['000'], budgetRules: [] }), storage);
+    const fromFile = settings({ dedicatedCardTails: ['441'] });
+    expect(replaceEntries([entry('a', '2026-03-01')], storage, 10, fromFile).ok).toBe(true);
+    expect(loadState(storage).cardSettings).toEqual(fromFile);
+  });
+
+  it('복원: 규칙 하나 없는 오래된 백업(v3)이 지금 설정을 지우지 못한다', () => {
+    const storage = asStorage();
+    const current = settings();
+    saveCardSettings(current, storage);
+    expect(replaceEntries([entry('a', '2026-03-01')], storage, 10, emptyCardSettings()).ok).toBe(true);
+    expect(loadState(storage).cardSettings).toEqual(current);
+    // 파라미터를 안 넘기는 호출도 같은 동작(호출 측이 값을 빼먹었다고 설정이 사라지지 않음).
+    expect(replaceEntries([entry('b', '2026-03-02')], storage, 20).ok).toBe(true);
+    expect(loadState(storage).cardSettings).toEqual(current);
+  });
+
+  it('hasCardSettings: 빈 배열·빈 문자열만 있으면 false', () => {
+    expect(hasCardSettings(emptyCardSettings())).toBe(false);
+    expect(hasCardSettings({ ...emptyCardSettings(), periodFrom: '2026-01-01' })).toBe(true);
+    expect(hasCardSettings({ ...emptyCardSettings(), dedicatedCardTails: ['441'] })).toBe(true);
+    expect(hasCardSettings({ ...emptyCardSettings(), budgetRules: [{ match: 'a', budgetItem: 'b' }] })).toBe(true);
+    expect(hasCardSettings(settings())).toBe(true);
   });
 });

@@ -12,6 +12,7 @@
  * - 지울 수 없는 행이 있으면 개수를 그대로 드러냅니다 → 조용히 사라지는 데이터 없음.
  */
 import { SCHEMA_VERSION, sanitizeEntries, type ReceiptEntry } from './receipts';
+import { emptyCardSettings, normalizeCardSettings, type CardSettings } from './cardimport';
 
 export const STORAGE_KEY = 'startup-help/state/v1';
 
@@ -93,6 +94,8 @@ export interface AppState {
   /** 마지막으로 목록을 통째로 대체(백업 복원)한 시각(ms). 이 값보다 오래된 삭제 기록은 버립니다. */
   restoreAt: number | null;
   lastExportAt: string | null;
+  /** 카드사 명세서 수입 설정. 파일이 알려 주지 않아 사용자가 한 번 정한 값이라, 지출 행과 함께 백업됩니다. */
+  cardSettings: CardSettings;
 }
 
 export function emptyState(): AppState {
@@ -102,7 +105,8 @@ export function emptyState(): AppState {
     checklist: {},
     removed: [],
     restoreAt: null,
-    lastExportAt: null
+    lastExportAt: null,
+    cardSettings: emptyCardSettings()
   };
 }
 
@@ -168,7 +172,9 @@ export function normalizeState(raw: unknown): { state: AppState; dropped: number
       checklist,
       removed,
       restoreAt: typeof o.restoreAt === 'number' && Number.isFinite(o.restoreAt) ? o.restoreAt : null,
-      lastExportAt: typeof o.lastExportAt === 'string' ? o.lastExportAt : null
+      lastExportAt: typeof o.lastExportAt === 'string' ? o.lastExportAt : null,
+      // v3 까지의 저장본·백업에는 이 칸이 아예 없습니다 → 빈 설정으로 승격(추측 값으로 채우지 않습니다).
+      cardSettings: normalizeCardSettings(o.cardSettings)
     },
     dropped: Math.max(0, inputEntries.length - entries0.length),
     future
@@ -279,6 +285,21 @@ export function saveMeta(patch: { lastExportAt?: string | null }, storage: Stora
 }
 
 /**
+ * 카드사 명세서 수입 설정만 저장합니다. 지출 행은 건드리지 않습니다.
+ * 다른 탭이 이 칸을 고쳤을 수 있어 항상 저장된 값을 다시 읽은 뒤 그 위에 씁니다(덮어쓰는 칸은 설정 하나뿐).
+ */
+export function saveCardSettings(
+  settings: CardSettings,
+  storage: Storage | undefined = getStorage()
+): { ok: boolean; future: boolean; settings: CardSettings } {
+  const next = normalizeCardSettings(settings);
+  if (!storage) return { ok: false, future: false, settings: next };
+  const stored = readStored(storage);
+  if (stored.future) return { ok: false, future: true, settings: stored.state.cardSettings };
+  return { ok: saveState({ ...stored.state, cardSettings: next }, storage), future: false, settings: next };
+}
+
+/**
  * 체크리스트만 저장합니다. 지출 항목은 저장된 값을 그대로 두므로,
  * 다른 탭에서 정리 도구를 쓰다가 이 화면에서 체크하나 켜도 입력이 사라지지 않습니다.
  * 여러 탭의 체크 결과는 합칩니다(저장된 값 + 이번 값).
@@ -351,15 +372,26 @@ export function parseBackup(text: string): RestoreResult {
  * 체크리스트는 저장된 값을 보존하고, 삭제 기록은 비웁니다(복원 파일의 행이 지난 삭제에 지워지면 안 됩니다).
  * 대신 대체 시각(restoreAt)을 찍습니다. 이 값이 커지면 다른 탭은 자기가 들고 있던 삭제 기록을
  * 버리고 저장된 목록을 그대로 받아들입니다 — 복원된 행을 예전 삭제 기록이 지워버리는 사고 방지.
+ *
+ * `cardSettings` 는 예외적으로 파일 값을 받아들이니다(없으면 지금 설정 유지) — 지난 달에 정해 둔
+ * 수입 규칙을 새 브라우저에서 다시 치받지 않아도 되게 만드는 것이 그 값의 존재 이유입니다.
  */
 export function replaceEntries(
   entries: readonly ReceiptEntry[],
   storage: Storage | undefined = getStorage(),
-  at: number = Date.now()
-): { ok: boolean; future: boolean; restoreAt: number | null } {
-  if (!storage) return { ok: false, future: false, restoreAt: null };
+  at: number = Date.now(),
+  cardSettings?: CardSettings
+): { ok: boolean; future: boolean; restoreAt: number | null; cardSettings: CardSettings } {
+  if (!storage)
+    return { ok: false, future: false, restoreAt: null, cardSettings: normalizeCardSettings(cardSettings ?? emptyCardSettings()) };
   const stored = readStored(storage);
-  if (stored.future) return { ok: false, future: true, restoreAt: stored.state.restoreAt };
-  const ok = saveState({ ...stored.state, entries: entries.slice(), removed: [], restoreAt: at }, storage);
-  return { ok, future: false, restoreAt: ok ? at : stored.state.restoreAt };
+  if (stored.future) return { ok: false, future: true, restoreAt: stored.state.restoreAt, cardSettings: stored.state.cardSettings };
+  const settings = cardSettings && hasCardSettings(cardSettings) ? cardSettings : stored.state.cardSettings;
+  const ok = saveState({ ...stored.state, entries: entries.slice(), removed: [], restoreAt: at, cardSettings: settings }, storage);
+  return { ok, future: false, restoreAt: ok ? at : stored.state.restoreAt, cardSettings: settings };
+}
+
+/** 설정에 실제로 들어찬 칸이 하나라도 있는지 (빈 설정으로 지금 값을 덮어쓰지 않기 위한 판단). */
+export function hasCardSettings(s: CardSettings): boolean {
+  return s.dedicatedCardTails.length > 0 || s.budgetRules.length > 0 || s.periodFrom !== '' || s.periodTo !== '';
 }

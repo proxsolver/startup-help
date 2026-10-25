@@ -7,9 +7,12 @@ import {
   PERIOD_STATES,
   SUBMIT_STATES
 } from '../lib/receipts';
+import { MAX_IMPORT_BYTES } from '../lib/cardimport';
 import { MAX_BACKUP_BYTES, MAX_BACKUP_ENTRIES, MAX_BACKUP_RECORDS } from '../lib/storage';
 
 const today = new Date().toISOString().slice(0, 10);
+/** 안내 문구가 코드 상한과 다른 숫자를 보여주지 않도록, 파일 크기 한계도 상수에서 만들어 씁니다. */
+const importLimit = `${Math.round(MAX_IMPORT_BYTES / 1024 / 1024)}MB까지`;
 /** 화면 안내가 코드 상한과 다른 숫자를 보여주지 않도록, 이 문장은 상수에서 만들어 씁니다. */
 const backupLimit = [
   `${Math.round(MAX_BACKUP_BYTES / 1024 / 1024)}MB`,
@@ -80,6 +83,90 @@ const backupLimit = [
       </div>
     </div>
     <p class="small muted" data-form-msg style="margin:.6rem 0 0"></p>
+  </div>
+
+  <div class="card no-print" style="margin-bottom:1.2rem" data-imp-card>
+    <h2 style="margin-top:0;font-size:1.05rem;border:0;padding:0">카드사 명세서 파일로 한 번에 넣기</h2>
+    <p class="small muted" style="margin-top:0">
+      카드사에서 받은 표 계산 파일(<code>.xlsx</code> · <code>.csv</code> · <code>.tsv</code>)을 고르거나 이 칸에 끌어다 놓으면,
+      거래일·가맹점명·금액·승인번호를 읽어 아래 미리보기로 보여줍니다. 추가 단추를 누르기 전에는 목록에 아무것도 들어가지 않습니다.
+      <strong>파일이 서버로 올라가지는 않습니다</strong> — 이 사이트는 정적 페이지라 보낼 저장소가 없고, 읽는 코드가 전부 이 페이지 안에 있습니다.
+    </p>
+    <p class="small muted" style="margin-top:.4rem">
+      양식이 알려 주지 않은 것(어느 카드가 전용카드인지 · 협약 집행기간 · 가맹점별 비목)만 아래 <strong>세 칸</strong>에서 한 번 정해 주세요.
+      그 답은 이 브라우저에 저장되어 다음 달 파일부터 자동으로 적용됩니다. 정해 두지 않은 칸은 값을 추측하지 않고
+      <strong>확인 필요</strong>·빈 비목으로 남기고, 미리보기 아래「이것만 정해 주세요」에 모아 보여줍니다.
+    </p>
+    <div class="row" role="group" aria-label="명세서 파일">
+      <div style="flex:2 1 280px">
+        <label for="imp-file">명세서 파일 ({importLimit})</label>
+        <input type="file" id="imp-file" accept=".xlsx,.xls,.csv,.tsv,text/csv" />
+      </div>
+    </div>
+    <p class="notice" data-imp-drop hidden>여기에 파일을 놓으면 읽습니다.</p>
+    <p class="notice" data-imp-error hidden></p>
+
+    <details data-imp-settings style="margin:.8rem 0 0">
+      <summary><strong>한 번만 정해 두는 설정</strong> <span class="muted small">(전용카드 끝번호 · 집행기간 · 가맹점→비목)</span></summary>
+      <div class="row" style="margin-top:.9rem" role="group" aria-label="수입 설정">
+        <div style="flex:2 1 220px">
+          <label for="imp-tails">전용(체크)카드 끝번호 (쉼표로 여러 개)</label>
+          <input type="text" id="imp-tails" placeholder="예: 441, 902" autocomplete="off" />
+        </div>
+        <div>
+          <label for="imp-from">집행기간 시작</label>
+          <input type="date" id="imp-from" />
+        </div>
+        <div>
+          <label for="imp-to">집행기간 종료</label>
+          <input type="date" id="imp-to" />
+        </div>
+      </div>
+      <div class="row" style="margin-top:.6rem">
+        <div style="flex:2 1 280px">
+          <label for="imp-rules">가맹점 이름 조각 → 비목 (한 줄에 하나)</label>
+          <textarea id="imp-rules" rows="4" placeholder="예: 원단상사=재료비&#10;택배=운송비&#10;# 이 줄은 건너뜁니다"></textarea>
+        </div>
+      </div>
+      <div class="row" style="margin-top:.6rem;align-items:start">
+        <div class="shrink"><button class="btn" type="button" data-imp-settings-save>설정을 이 브라우저에 저장</button></div>
+        <p class="small muted" data-imp-settings-note role="status" aria-live="polite" style="margin:.4rem 0 0"></p>
+      </div>
+      <p class="small muted" style="margin-top:.4rem">
+        끝번호를 비워 두면 결제경로를 <strong>확인 필요</strong>로 둡니다 — 명세서의 선불·후불 표기만으로는 개인카드인지 전용카드인지 알 수 없습니다.
+        집행기간을 비워 두면 기간 판정도 <strong>확인 필요</strong>로 남습니다.
+      </p>
+    </details>
+
+    <div data-imp-preview hidden style="margin-top:1.1rem">
+      <p class="small" data-imp-summary style="margin:0 0 .5rem"></p>
+      <p class="small muted scroll-hint">열이 일곱 개입니다. 좁은 화면에서는 이 표를 좌우로 밀어 보세요.</p>
+      <div class="table-scroll">
+        <table>
+          <caption class="small muted">미리보기 — 아래 「목록에 추가」를 눌러야 저장됩니다</caption>
+          <thead>
+            <tr>
+              <th scope="col">지출일</th><th scope="col">거래처</th><th scope="col">금액</th>
+              <th scope="col">비목</th><th scope="col">결제경로</th><th scope="col">집행 기간</th><th scope="col">메모</th>
+            </tr>
+          </thead>
+          <tbody data-imp-rows></tbody>
+        </table>
+      </div>
+      <div class="notice info" style="margin:.7rem 0 0">
+        <strong>이것만 정해 주세요</strong>
+        <ul data-imp-gaps style="margin:.4rem 0 0"></ul>
+      </div>
+      <div class="row" style="margin-top:.8rem">
+        <div class="shrink"><button class="btn" type="button" data-imp-commit>목록에 추가</button></div>
+        <div class="shrink"><button class="btn ghost" type="button" data-imp-discard>미리보기 취소</button></div>
+      </div>
+      <p class="small muted" style="margin-top:.6rem">
+        수취상태는 모두 <strong>미수취</strong>로 들어갑니다 — 카드사 명세서는 거래 내역을 알려주는 서류일 뿐 매출전표 원본이 아닙니다.
+        전표 파일(PDF 등)을 받아「원본 확보」로 바꿔 두어야 정산 꾸러미에서 증빙 공백으로 잡히지 않습니다.
+        같은 파일을 두 번 넣으면 이미 있는 행은 건너뛰고, 지난번에 지우신 행도 되살리지 않습니다(지운 기록이 그 id 를 기억합니다).
+      </p>
+    </div>
   </div>
 
   <div class="card" style="margin-bottom:1.2rem">
@@ -239,6 +326,11 @@ const backupLimit = [
     <strong>JSON 복원</strong>은 이 도구가 내보낸 백업 파일만 읽습니다. 한 번에 받는 범위는 {backupLimit} 까지이고, 넘으면 복원하지 않고 사유를 알려줍니다 — 복원 시도 하나가 이 탭을 죽이지 못하게 하기 때문입니다.
   </p>
 
+  <p class="small muted no-print" style="margin-top:.4rem">
+    <strong>JSON 백업</strong>에는 지출 목록 · 체크리스트 확인 결과 · 위 명세서 수입 설정(전용카드 끝번호 · 집행기간 · 가맹점→비목 규칙)이 함께 들어갑니다.
+    다른 브라우저에서 복원하면 지난 달에 정해 둔 수입 규칙까지 그대로 적용됩니다.
+  </p>
+
   <p class="notice" data-storage-warning hidden>
     <strong>브라우저 저장에 실패했습니다</strong>
     시크릿 창이거나 저장 한도를 넘어선 것으로 보입니다. 지금 입력은 새로고침 뒤 사라집니다. JSON 백업을 먼저 받으세요.
@@ -261,10 +353,22 @@ const backupLimit = [
     type ReceiptEntry
   } from '../lib/receipts';
   import { buildBundle, bundleFileName, dataPeriod } from '../lib/bundle';
+  import {
+    cardSettingsToOptions,
+    formatBudgetRuleLines,
+    importCardFile,
+    MAX_IMPORT_BYTES,
+    normalizeCardSettings,
+    parseBudgetRuleLines,
+    parseTails,
+    type CardSettings,
+    type ImportResult
+  } from '../lib/cardimport';
   import { CHECKLIST } from '../data/checklists';
   import {
     backupFileName,
     clearEntries,
+    hasCardSettings,
     isBackupFileTooLarge,
     loadStateDetailed,
     MAX_BACKUP_BYTES,
@@ -272,6 +376,7 @@ const backupLimit = [
     MAX_TOMBSTONES,
     parseBackup,
     replaceEntries,
+    saveCardSettings,
     saveEntries,
     saveMeta,
     serializeState,
@@ -730,16 +835,20 @@ const backupLimit = [
         droppedCount = dropped;
         resetFilterControls();
         // 복원은 목록 전체를 대체합니다(다른 탭 행과 병합하지 않음). 체크리스트는 저장된 값 그대로 둡니다.
-        const res = replaceEntries(state.entries);
+        // 수입 설정은 예외로 파일 값을 받아들입니다 — 규칙 없는 오래된 백업이면 지금 값이 남고, 그 판단은 replaceEntries 가 돌려줍니다.
+        const res = replaceEntries(state.entries, undefined, Date.now(), restored.cardSettings);
         writeBlocked = res.future;
         state.restoreAt = res.restoreAt;
+        state.cardSettings = res.cardSettings;
+        hydrateSettingsInputs();
         if (warning) warning.hidden = res.ok;
         showLoadNote();
         render();
         const skipped = dropped > 0 ? ` · 형식 오류 ${dropped}건은 건너뜀` : '';
+        const settingsNote = hasCardSettings(restored.cardSettings) ? '· 파일의 수입 규칙을 적용' : '· 수입 규칙은 이 브라우저 값 유지';
         if (status)
           status.textContent = res.ok
-            ? `복원 완료 · ${state.entries.length}건${skipped}`
+            ? `복원 완료 · ${state.entries.length}건${skipped} · ${settingsNote}`
             : `저장소에 쓰지 못했습니다 · 화면만 ${state.entries.length}건으로 바꿨습니다. 백업·다른 탭 저장 상태와 다를 수 있습니다.`;
         fileInput.value = '';
       };
@@ -774,6 +883,262 @@ const backupLimit = [
       showLoadNote();
       render();
       if (status) status.textContent = '지출 목록을 비웠습니다. 체크리스트 확인 결과는 그대로 남아 있습니다.';
+    });
+
+    /* ───────── 카드사 명세서 파일 수입 ───────── */
+
+    const impCard = el('imp-card');
+    const impFile = input<HTMLInputElement>('imp-file');
+    const impDrop = el('imp-drop');
+    const impError = el('imp-error');
+    const impPreview = el('imp-preview');
+    const impSummary = el('imp-summary');
+    const impRows = el('imp-rows');
+    const impGaps = el('imp-gaps');
+    const impCommit = el('imp-commit') as HTMLButtonElement | null;
+    const impDiscard = el('imp-discard');
+    const impSettings = document.querySelector<HTMLDetailsElement>('[data-imp-settings]');
+    const impSettingsNote = el('imp-settings-note');
+    /** 미리보기에는 열두 행만 — 큰 파일을 화면에 다 심으면 추가하기 전에 브라우저가 먼저 느려집니다. */
+    const PREVIEW_ROWS = 12;
+
+    let pending: ImportResult | null = null;
+    let pendingName = '';
+    /** 설정을 고쳐도 파일을 다시 고르지 않도록 마지막 File 을 이 화면 기억에 두고 다시 읽습니다. */
+    let lastFile: File | null = null;
+
+    function settingsFromInputs(): CardSettings {
+      return normalizeCardSettings({
+        dedicatedCardTails: parseTails(field('imp-tails')),
+        periodFrom: field('imp-from'),
+        periodTo: field('imp-to'),
+        budgetRules: parseBudgetRuleLines(val('imp-rules'))
+      });
+    }
+
+    function hydrateSettingsInputs(): void {
+      const s = state.cardSettings;
+      const tails = input<HTMLInputElement>('imp-tails');
+      if (tails) tails.value = s.dedicatedCardTails.join(', ');
+      const from = input<HTMLInputElement>('imp-from');
+      if (from) from.value = s.periodFrom;
+      const to = input<HTMLInputElement>('imp-to');
+      if (to) to.value = s.periodTo;
+      const rules = input<HTMLTextAreaElement>('imp-rules');
+      if (rules) rules.value = formatBudgetRuleLines(s.budgetRules);
+    }
+    hydrateSettingsInputs();
+
+    function showImpError(lines: string[]): void {
+      if (!impError) return;
+      impError.textContent = '';
+      for (const line of lines) {
+        const span = document.createElement('span');
+        span.style.display = 'block';
+        span.textContent = line;
+        impError.appendChild(span);
+      }
+      impError.hidden = false;
+    }
+
+    function clearImpError(): void {
+      if (!impError) return;
+      impError.textContent = '';
+      impError.hidden = true;
+    }
+
+    /** 미리볼 행을 새 행 / 이미 있는 행 / 지운 적 있는 행으로 가릅니다(중복 id 는 있는 행으로 칩니다). */
+    function splitPending(): { fresh: ReceiptEntry[]; existing: number; resurrect: number } {
+      const fresh: ReceiptEntry[] = [];
+      let existing = 0;
+      let resurrect = 0;
+      if (!pending) return { fresh, existing, resurrect };
+      const known = new Set(state.entries.map((e) => e.id));
+      const gone = new Set(state.removed);
+      const seen = new Set<string>();
+      for (const e of pending.entries) {
+        if (known.has(e.id) || seen.has(e.id)) {
+          existing++;
+          continue;
+        }
+        seen.add(e.id);
+        if (gone.has(e.id)) {
+          resurrect++;
+          continue;
+        }
+        fresh.push(e);
+      }
+      return { fresh, existing, resurrect };
+    }
+
+    function renderPreview(): void {
+      if (!impPreview || !impRows || !impGaps || !impSummary || !impCommit) return;
+      if (!pending) {
+        impPreview.hidden = true;
+        return;
+      }
+      impPreview.hidden = false;
+      const { fresh, existing, resurrect } = splitPending();
+
+      impRows.textContent = '';
+      for (const e of fresh.slice(0, PREVIEW_ROWS)) {
+        const tr = document.createElement('tr');
+        for (const text of [
+          e.date,
+          e.vendor || '(거래처 없음)',
+          formatKRW(e.amount),
+          e.budgetItem || '(비목 미정)',
+          e.payMethod,
+          e.periodState,
+          e.memo
+        ])
+          tr.appendChild(cell(text));
+        impRows.appendChild(tr);
+      }
+      if (fresh.length > PREVIEW_ROWS) {
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = 7;
+        td.className = 'muted';
+        td.textContent = `외 ${fresh.length - PREVIEW_ROWS}건 — 추가를 누르면 미리보지 않은 행까지 한 번에 들어갑니다`;
+        tr.appendChild(td);
+        impRows.appendChild(tr);
+      }
+
+      const bits = [`파일 행 ${pending.totalRows}개`, `집행 행 ${pending.entries.length}건`, `추가할 행 ${fresh.length}건`];
+      if (existing > 0) bits.push(`이미 목록에 있는 ${existing}건은 건너뜀`);
+      if (resurrect > 0) bits.push(`지난번에 지운 ${resurrect}건은 되살리지 않음`);
+      impSummary.textContent = `${pendingName} · ${bits.join(' · ')}`;
+      impCommit.textContent = fresh.length > 0 ? `${fresh.length}건을 목록에 추가` : '추가할 새 행이 없습니다';
+      impCommit.disabled = fresh.length === 0;
+
+      impGaps.textContent = '';
+      for (const g of pending.gaps) {
+        const li = document.createElement('li');
+        const items = g.items.length > 0 ? ` — ${g.items.slice(0, 6).join(', ')}${g.items.length > 6 ? ` 외 ${g.items.length - 6}개` : ''}` : '';
+        li.textContent = `${g.label}${items}`;
+        impGaps.appendChild(li);
+      }
+      if (pending.gaps.length === 0) {
+        const li = document.createElement('li');
+        li.textContent = '정해 주지 않으면 안 되는 것이 남지 않았습니다.';
+        impGaps.appendChild(li);
+      }
+    }
+
+    async function readCardFile(file: File): Promise<void> {
+      clearImpError();
+      if (file.size > MAX_IMPORT_BYTES) {
+        pending = null;
+        renderPreview();
+        showImpError([
+          `파일이 ${(MAX_IMPORT_BYTES / 1024 / 1024).toFixed(0)}MB 를 넘어 읽지 않았습니다. 명세서 파일치고는 너무 큽니다.`,
+          '엑셀에서 필요한 기간 행만 잘라 다른 파일로 저장해 넣거나, CSV 로 저장해 주세요.'
+        ]);
+        return;
+      }
+      lastFile = file;
+      try {
+        const result = await importCardFile(file, cardSettingsToOptions(state.cardSettings));
+        pending = result;
+        pendingName = file.name;
+        renderPreview();
+        if (result.entries.length === 0) {
+          showImpError([
+            '이 파일에서는 집행 행을 한 건도 읽지 못했습니다. 위에서 알려준 사유를 확인해 주세요.',
+            '위에서 알려준 사유를 확인해 주세요. 행을 못 읽은 상태에서 목록에는 아무것도 들어가지 않았습니다.'
+          ]);
+        } else if (impSettings && result.gaps.some((g) => g.kind !== 'evidence-unread')) {
+          // 답할 칸이 닫힌 채 목록만 보여 주지 않도록, 정할 것이 남아 있으면 설정 상자를 엽니다.
+          impSettings.open = true;
+        }
+        if (status) status.textContent = `${file.name} · ${result.entries.length}건 미리보기 (아직 추가 전)`;
+      } catch (e) {
+        pending = null;
+        renderPreview();
+        const reason = e instanceof Error ? e.message : String(e);
+        const xlsxHint =
+          /\.xlsx?$/i.test(file.name)
+            ? ' .xlsx 는 브라우저가 zip 압축을 풀어 읽습니다(Chrome 103 · Safari 16.4 · Firefox 113 이후). 이 브라우저에서 그 기능이 안 돌아가면 엑셀에서 CSV 또는 TSV로 저장해 넣어 주세요 — CSV 는 압축 없이 읽힙니다.'
+            : '';
+        showImpError([`파일을 읽지 못했습니다: ${reason}${xlsxHint}`, '읽기에 실패한 파일은 목록에 아무것도 넣지 않았습니다.']);
+        if (status) status.textContent = `${file.name} 읽기에 실패했습니다.`;
+      } finally {
+        // 같은 파일을 다시 고르기도/change 가 걸리게 입력란은 비웁니다.
+        if (impFile) impFile.value = '';
+      }
+    }
+
+    impFile?.addEventListener('change', () => {
+      const f = impFile.files?.[0];
+      if (f) void readCardFile(f);
+    });
+
+    let dragDepth = 0;
+    impCard?.addEventListener('dragenter', (event) => {
+      event.preventDefault();
+      dragDepth++;
+      if (impDrop) impDrop.hidden = false;
+    });
+    impCard?.addEventListener('dragover', (event) => {
+      // 놓는 것을 허용하지 않으면 drop 이 아예 발생하지 않습니다.
+      event.preventDefault();
+    });
+    impCard?.addEventListener('dragleave', () => {
+      dragDepth = Math.max(0, dragDepth - 1);
+      if (dragDepth === 0 && impDrop) impDrop.hidden = true;
+    });
+    impCard?.addEventListener('drop', (event) => {
+      event.preventDefault();
+      dragDepth = 0;
+      if (impDrop) impDrop.hidden = true;
+      const f = (event as DragEvent).dataTransfer?.files?.[0];
+      if (f) void readCardFile(f);
+      else showImpError(['드래그한 것에서 파일을 찾지 못했습니다. 파일 자체를 이 칸에 놓아 주세요(선택한 텍스트·링크는 읽지 않습니다).']);
+    });
+
+    impCommit?.addEventListener('click', () => {
+      if (!pending) return;
+      const { fresh, existing, resurrect } = splitPending();
+      if (fresh.length === 0) {
+        if (status) status.textContent = '추가할 새 행이 없습니다. 이미 목록에 있는 행입니다.';
+        return;
+      }
+      state.entries = state.entries.concat(fresh).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+      persist();
+      render();
+      const notes: string[] = [];
+      if (existing > 0) notes.push(`이미 있던 ${existing}건 건너뜀`);
+      if (resurrect > 0) notes.push(`지운 적 있는 ${resurrect}건은 되살리지 않음(필요하면 새 지출 추가에 입력하세요)`);
+      if (status) status.textContent = `${pendingName} · ${fresh.length}건 추가${notes.length ? ` · ${notes.join(' · ')}` : ''}`;
+      pending = null;
+      pendingName = '';
+      lastFile = null;
+      renderPreview();
+    });
+
+    impDiscard?.addEventListener('click', () => {
+      pending = null;
+      pendingName = '';
+      lastFile = null;
+      clearImpError();
+      renderPreview();
+      if (status) status.textContent = '미리보기를 취소했습니다. 목록은 그대로입니다.';
+    });
+
+    el('imp-settings-save')?.addEventListener('click', () => {
+      const res = saveCardSettings(settingsFromInputs());
+      state.cardSettings = res.settings;
+      hydrateSettingsInputs();
+      if (impSettingsNote) {
+        impSettingsNote.textContent = res.future
+          ? '이 브라우저에 더 새로운 형식 데이터가 있어 설정을 저장하지 않았습니다. 이번 화면에서는 적용됩니다.'
+          : res.ok
+            ? '저장했습니다 — 다음 파일부터 이 설정으로 읽습니다. JSON 백업에도 함께 들어갑니다.'
+            : '이 브라우저 저장에 실패했습니다. 이번 화면에서는 적용되지만 새로 고침하면 사라집니다.';
+      }
+      // 설정을 고치면 미리보기도 바뀐 설정으로 다시 읽힙니다(파일을 다시 골라야 하는 번거로움을 없애기 위해).
+      if (lastFile) void readCardFile(lastFile);
     });
 
     // 다른 탭에서 저장한 내용은 이 화면에 자동 반영합니다(합치기 규칙은 saveEntries 와 동일).
