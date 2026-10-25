@@ -328,7 +328,9 @@ th {
   min-width: 44rem;
 }
 .table-scroll > table:has(th:nth-child(9)) {
-  min-width: 62rem;
+  /* 61rem = 976px — 데스크톱 본문(카드 안) 너비와 같아서, 넓은 화면에서는 스크롤이 필요 없고
+     그 아래에서는 밀립니다(1440px/1024px 실측). */
+  min-width: 61rem;
 }
 /* 표 전체 폭을 확보해도 자동 레이아웃이 첫 열을 50~66px 로 눌러 버립니다(실측: 캘린더 항목명 50px,
    문서 표 첫 열 53px, 저장 방식 표 첫 열 61px). 행 이름이 좁은 열에 몇 줄씩 쌓여 읽기 어려워집니다.
@@ -336,12 +338,21 @@ th {
 table:has(th:nth-child(2)) tr > :first-child {
   min-width: 6rem;
 }
-/* 스크롤이 있다는 사실은 보여야 압니다. 넓은 화면에서는 이 안내를 뺍니다. */
+/* 스크롤이 있다는 사실은 보여야 압니다. 안내는 표가 컨테이너보다 실제로 넓어지는 폭까지만
+   보여줍니다 — 704px 표는 768px 에서 간신히 들어가고(실측), 976px 표는 본문 카드가
+   1080px 에서 막히므로 그 아래에서는 항상 밀립니다. 그래서 기본 780px,
+   가장 넓은 표(입력 목록 11열)에만 .wide 로 1080px 를 씁니다. */
 .scroll-hint {
   display: none;
 }
 @media (max-width: 780px) {
   .scroll-hint {
+    display: block;
+    margin: -0.4rem 0 0.8rem;
+  }
+}
+@media (min-width: 781px) and (max-width: 1080px) {
+  .scroll-hint.wide {
     display: block;
     margin: -0.4rem 0 0.8rem;
   }
@@ -462,8 +473,11 @@ input[type='number'] {
    항목 이름 줄 전체를 세로 42px 이상 눌리게 만듭니다(실측 42~69px). */
 .check-item .label {
   display: block;
-  padding-block: 0.45rem;
-  margin: -0.45rem 0;
+  padding-top: 0.45rem;
+  margin-top: -0.45rem;
+  /* 아래쪽은 음수 마진으로 되돌리지 않습니다 — 다음 줄(설명·링크)이 그 위를 덮으면
+     눌림 영역 아래쪽 5px 에서 체크가 토글되지 않습니다(390px 실측). */
+  padding-bottom: 0.3rem;
   cursor: pointer;
 }
 .check-item.done .label {
@@ -514,18 +528,37 @@ input[type='number'] {
     break-inside: avoid;
   }
   /* 화면에서는 넓은 표를 좌우로 밀어 보지만, 인쇄에서는 미는 것이 없어 잘리면 안 됩니다.
-     그래서 화면용으로 준 최소 너비를 풀고 표를 페이지 폭에 맞춥니다.
+     그래서 화면용으로 준 표 전체 최소 너비를 풀고 표를 페이지 폭에 맞춥니다(첫 열 하한은 남깁니다 — 아래).
      화면용 최소 너비 규칙은 우선순위가 높으니 !important 로 이깁니다. */
   .table-scroll {
     overflow: visible;
+  }
+  /* 종이에 "밀어 보세요" 는 쓸모가 없습니다. 아래쪽이라 좁은 화면 규칙보다 나중에 이깁니다. */
+  .scroll-hint {
+    display: none;
   }
   .table-scroll > table {
     min-width: 0 !important;
     font-size: 9pt;
   }
+  /* 화면용 첫 열 하한(6rem) 은 인쇄에서도 그대로 둡니다 — 함께 풀면 자동 레이아웃이 행 이름 열을 46px 까지
+     눌러 항목명이 두어 글자씩 세로로 쌓인 채 찍혔습니다(816px 인쇄 매체 실측).
+     표 전체의 최소 너비는 위에서 풀었으니 하한을 남겨도 종이를 넘치지 않습니다(항목 열 108px · 표 737px). */
+  /* 표 안 링크에는 주소를 붙이지 않습니다. 인쇄용 href 가 확인 열을 209px 로 늘려 다른 열을 굶게 했습니다(실측). */
+  .table-scroll a::after {
+    content: none;
+  }
   .table-scroll th,
   .table-scroll td {
     padding: 0.35rem 0.4rem;
+    /* 종이가 좁을 때 긴 단위(주소·영문 단어) 가 칸 최소 폭을 밀어 올리면 표가 페이지를 넘깁니다.
+       anywhere 는 잘라 먹을 수 있다는 뜻이라 최소 폭 계산에도 반영돼, 넘침이 먼저 사라집니다(360px 인쇄 실측). */
+    overflow-wrap: anywhere;
+  }
+  /* 알약 모양 배지는 화면에서는 한 줄로 묶지만, 종에서는 표 열의 최소 폭을 그 단어 길이가 결정해
+     다른 열이 25px 로 짓눌립니다(360px 인쇄 실측: 시점 열 103px). 인쇄에서는 감싸게 둡니다. */
+  .badge {
+    white-space: normal;
   }
   a::after {
     content: ' (' attr(href) ')';
