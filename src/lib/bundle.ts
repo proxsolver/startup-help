@@ -49,6 +49,7 @@ function gapRows(entries: ReceiptEntry[]): string[][] {
   return evidenceGapList(entries).map((e) => [
     e.date,
     e.vendor || '(거래처 미입력)',
+    e.approvalNo || DASH,
     formatKRW(e.amount),
     e.evidenceType,
     e.evidenceState
@@ -58,14 +59,28 @@ function gapRows(entries: ReceiptEntry[]): string[][] {
 function riskRows(entries: ReceiptEntry[]): string[][] {
   return entries
     .filter((e) => e.periodState === '기간 외' || e.periodState === '확인 필요')
-    .map((e) => [e.date, e.vendor || '(거래처 미입력)', formatKRW(e.amount), e.periodState, e.memo || '']);
+    .map((e) => [
+      e.date,
+      e.vendor || '(거래처 미입력)',
+      e.approvalNo || DASH,
+      formatKRW(e.amount),
+      e.periodState,
+      e.memo || ''
+    ]);
 }
 
 function unsubmittedRows(entries: ReceiptEntry[]): string[][] {
   // 요약의 '제출 전' 값과 같은 기준으로 뽑습니다. 미제출·보완 요청만 걸면 합계 칸과 목록 건수가 어긋납니다.
   return entries
     .filter((e) => e.submitState !== '제출 완료')
-    .map((e) => [e.date, e.vendor || '(거래처 미입력)', formatKRW(e.amount), e.budgetItem || '(비목 미입력)', e.submitState]);
+    .map((e) => [
+      e.date,
+      e.vendor || '(거래처 미입력)',
+      e.approvalNo || DASH,
+      formatKRW(e.amount),
+      e.budgetItem || '(비목 미입력)',
+      e.submitState
+    ]);
 }
 
 function totalsBlock(totals: Totals): string {
@@ -113,8 +128,15 @@ export function buildRequestDraft(entries: ReceiptEntry[], opts: { period?: stri
       ? [
           `요청 대상 (집행일순 ${gaps.length}건)`,
           textTable(
-            ['지출일', '거래처', '금액', '증빙 종류', '현재 상태'],
-            gaps.map((e) => [e.date, e.vendor || '〔거래처〕', formatKRW(e.amount), e.evidenceType, e.evidenceState])
+            ['지출일', '거래처', '승인번호', '금액', '증빙 종류', '현재 상태'],
+            gaps.map((e) => [
+              e.date,
+              e.vendor || '〔거래처〕',
+              e.approvalNo || DASH,
+              formatKRW(e.amount),
+              e.evidenceType,
+              e.evidenceState
+            ])
           ),
           ''
         ]
@@ -151,13 +173,15 @@ export function buildBundle(input: BundleInput): string {
     totals.count === 0 ? '  (집행 기록이 없습니다. 입력 후 다시 내보내세요.)' : totalsBlock(totals),
     '',
     '2. 증빙 공백 목록',
-    gaps.length === 0 ? '  없음' : textTable(['지출일', '거래처', '금액', '증빙 종류', '수취 상태'], gaps),
+    gaps.length === 0
+      ? '  없음'
+      : textTable(['지출일', '거래처', '승인번호', '금액', '증빙 종류', '수취 상태'], gaps),
     '',
     '3. 기간 리스크 (기간 외 / 확인 필요)',
-    risks.length === 0 ? '  없음' : textTable(['지출일', '거래처', '금액', '집행 기간', '메모'], risks),
+    risks.length === 0 ? '  없음' : textTable(['지출일', '거래처', '승인번호', '금액', '집행 기간', '메모'], risks),
     '',
     '4. 제출 전 항목 (제출 완료 아닌 것)',
-    open.length === 0 ? '  없음' : textTable(['지출일', '거래처', '금액', '비목', '제출 상태'], open),
+    open.length === 0 ? '  없음' : textTable(['지출일', '거래처', '승인번호', '금액', '비목', '제출 상태'], open),
     '',
     '5. 비목별 합계',
     groupBlock('비목', totals.byBudgetItem),

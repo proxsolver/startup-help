@@ -7,10 +7,13 @@ import {
   PERIOD_STATES,
   SUBMIT_STATES
 } from '../lib/receipts';
+import { MAX_REPORT_FIELD_CHARS, MAX_REPORT_NOTE_CHARS, REPORT_FIELDS } from '../lib/report';
 import { MAX_IMPORT_BYTES } from '../lib/cardimport';
 import { MAX_BACKUP_BYTES, MAX_BACKUP_ENTRIES, MAX_BACKUP_RECORDS } from '../lib/storage';
 
 const today = new Date().toISOString().slice(0, 10);
+/** 저장 로직의 칸 이름과 화면의 입력 id 를 한 곳에서 대응시킵니다(camelCase → rep-kebab-case). */
+const fieldId = (key: string) => `rep-${key.replace(/([A-Z])/g, '-$1').toLowerCase()}`;
 /** 안내 문구가 코드 상한과 다른 숫자를 보여주지 않도록, 파일 크기 한계도 상수에서 만들어 씁니다. */
 const importLimit = `${Math.round(MAX_IMPORT_BYTES / 1024 / 1024)}MB까지`;
 /** 화면 안내가 코드 상한과 다른 숫자를 보여주지 않도록, 이 문장은 상수에서 만들어 씁니다. */
@@ -40,6 +43,10 @@ const backupLimit = [
       <div>
         <label for="f-vendor">거래처</label>
         <input type="text" id="f-vendor" placeholder="예: 원단상사" autocomplete="off" />
+      </div>
+      <div>
+        <label for="f-approval">승인번호</label>
+        <input type="text" id="f-approval" placeholder="예: 01234567" autocomplete="off" inputmode="text" />
       </div>
       <div>
         <label for="f-amount">금액 (원)</label>
@@ -140,13 +147,13 @@ const backupLimit = [
 
     <div data-imp-preview hidden style="margin-top:1.1rem">
       <p class="small" data-imp-summary style="margin:0 0 .5rem"></p>
-      <p class="small muted scroll-hint">열이 일곱 개입니다. 좁은 화면에서는 이 표를 좌우로 밀어 보세요.</p>
+      <p class="small muted scroll-hint">열이 여덟 개입니다. 좁은 화면에서는 이 표를 좌우로 밀어 보세요.</p>
       <div class="table-scroll">
         <table>
           <caption class="small muted">미리보기 — 아래 「목록에 추가」를 눌러야 저장됩니다</caption>
           <thead>
             <tr>
-              <th scope="col">지출일</th><th scope="col">거래처</th><th scope="col">금액</th>
+              <th scope="col">지출일</th><th scope="col">거래처</th><th scope="col">승인번호</th><th scope="col">금액</th>
               <th scope="col">비목</th><th scope="col">결제경로</th><th scope="col">집행 기간</th><th scope="col">메모</th>
             </tr>
           </thead>
@@ -167,6 +174,71 @@ const backupLimit = [
         같은 파일을 두 번 넣으면 이미 있는 행은 건너뛰고, 지난번에 지우신 행도 되살리지 않습니다(지운 기록이 그 id 를 기억합니다).
       </p>
     </div>
+  </div>
+
+  <div class="card no-print" style="margin-bottom:1.2rem" data-report-card>
+    <h2 style="margin-top:0;font-size:1.05rem;border:0;padding:0">보고서 한 편으로 내보내기</h2>
+    <p class="small muted" style="margin-top:0">
+      방금 넣은 행과 이 화면의 분류를 그대로 모아 <strong>정리 보고서</strong>로 만들어 파일로 내려줍니다
+      (보고서 머리 · 1 집행 목록 · 2 비목별 합계 · 3 증빙 공백). 숫자는 화면 요약과 같은 계산 함수에서 나옵니다 — 파일 때문에 값이 달라지지 않습니다.
+      기관에 보내기 전에 아래 값은 직접 확인해야 합니다(사이트가 대신 정하지 않습니다).
+      <strong>「저장」을 누르지 않아도</strong> 아래 입력창에 지금 적힌 값이 그대로 보고서에 들어갑니다 — 저장은 다음에 이 화면을 열 때를 위해 남기는 일입니다.
+    </p>
+
+    <div class="row" style="margin-top:.9rem" role="group" aria-label="보고서 정보">
+      {
+        REPORT_FIELDS.map((f) => {
+          const id = fieldId(f.key);
+          const wide = f.key === 'note' || f.key === 'projectName';
+          return (
+            <div style={wide ? 'flex:2 1 280px' : undefined}>
+              <label for={id}>
+                {f.label}
+                {f.required ? <span class="muted small"> (필수)</span> : <span class="muted small"> (선택)</span>}
+              </label>
+              {f.key === 'note' ? (
+                <textarea id={id} rows="2" placeholder={f.hint} maxlength={MAX_REPORT_NOTE_CHARS} data-report-field={f.key} />
+              ) : f.key === 'periodFrom' || f.key === 'periodTo' ? (
+                <input type="date" id={id} data-report-field={f.key} />
+              ) : (
+                <input
+                  type="text"
+                  id={id}
+                  placeholder={f.hint}
+                  autocomplete="off"
+                  maxlength={MAX_REPORT_FIELD_CHARS}
+                  data-report-field={f.key}
+                />
+              )}
+            </div>
+          );
+        })
+      }
+    </div>
+
+    <div class="row" style="margin-top:.6rem;align-items:start">
+      <div class="shrink"><button class="btn ghost" type="button" data-report-save>보고서 정보를 이 브라우저에 저장</button></div>
+      <p class="small muted" data-report-note role="status" aria-live="polite" style="margin:.4rem 0 0"></p>
+    </div>
+
+    <p class="notice" data-report-gaps hidden>
+      <strong>보고서에 넣을 값이 더 필요합니다</strong>
+      <ul data-report-gap-list style="margin:.4rem 0 0"></ul>
+    </p>
+
+    <div class="row" style="margin-top:.7rem">
+      <div class="shrink"><button class="btn" type="button" data-export-report-html>보고서 HTML 내보내기</button></div>
+      <div class="shrink"><button class="btn ghost" type="button" data-export-report-docx>보고서 DOCX 내보내기</button></div>
+    </div>
+    <p class="small muted" style="margin-top:.5rem">
+      두 파일 모두 이 브라우저 안에서 조립되고, 담긴 값은 화면에 보이는 표와 같습니다. 내려받는 HTML 은 스크립트가 없는
+      단일 파일입니다 — 열어 확인한 뒤 브라우저에서 <strong>인쇄 → PDF로 저장</strong> 하면 A4 보고서 PDF 가 됩니다.
+      DOCX 는 OOXML(WordprocessingML) 규격을 지켜 이 사이트 코드가 손으로 조립한 파일이고, 글꼴은 맑은 고딕·Malgun Gothic 으로
+      지정합니다(그 글꼴이 없는 컴퓨터에서는 대체 글꼴로 보일 수 있습니다). <strong>실제 워드·한글 프로그램에서 열어 고쳐 본 것은
+      아직 아닙니다</strong> — 열리지 않거나 표가 어긋나면 HTML 로 받아 인쇄하거나, 아래 CSV·꾸러미를 쓰세요.
+      PDF 는 이 사이트가 직접 만들지 않습니다 — 한글 글꼴을 파일에 심지 않으면서
+      올바르게 나오도록 만드는 방법을 확인하지 못했기 때문에, 인쇄 경로만 안내합니다.
+    </p>
   </div>
 
   <div class="card" style="margin-bottom:1.2rem">
@@ -223,7 +295,7 @@ const backupLimit = [
         </select>
       </div>
       <div style="flex:2 1 200px">
-        <label for="q-text">거래처·비목·메모 검색</label>
+        <label for="q-text">거래처·승인번호·비목·메모 검색</label>
         <input type="search" id="q-text" placeholder="예: 택배" />
       </div>
       <div class="shrink">
@@ -267,12 +339,12 @@ const backupLimit = [
 
   <div class="card no-print" style="margin-bottom:1.2rem" data-gap-card hidden>
     <h2 style="margin-top:0;font-size:1.05rem;border:0;padding:0">재요청이 필요한 건 <span class="muted small">(수취 못 한 순서대로)</span></h2>
-    <p class="small muted scroll-hint no-print">열이 여섯 개입니다. 좁은 화면에서는 이 표를 좌우로 밀어 보세요.</p>
+    <p class="small muted scroll-hint no-print">열이 일곱 개입니다. 좁은 화면에서는 이 표를 좌우로 밀어 보세요.</p>
     <div class="table-scroll">
       <table>
         <thead>
           <tr>
-            <th scope="col">지출일</th><th scope="col">거래처</th><th scope="col">금액</th>
+            <th scope="col">지출일</th><th scope="col">거래처</th><th scope="col">승인번호</th><th scope="col">금액</th>
             <th scope="col">비목</th><th scope="col">수취 상태</th><th scope="col">메모</th>
           </tr>
         </thead>
@@ -284,22 +356,23 @@ const backupLimit = [
   <div class="card" style="margin-bottom:1.2rem">
     <h2 style="margin-top:0;font-size:1.05rem;border:0;padding:0">입력 목록 <span class="muted small">(필터 적용된 결과)</span></h2>
     <p class="small muted scroll-hint wide no-print">
-      열이 열한 개(마지막은 지우기 버튼)입니다. 화면보다 표가 넓으면 좌우로 밀어 보세요.
+      열이 열두 개(마지막은 지우기 버튼)입니다. 화면보다 표가 넓으면 좌우로 밀어 보세요.
       인쇄에는 지우기 열이 들어가지 않고, CSV 에는 이 표의 값에 전용카드 여부 열이 하나 더 들어갑니다.
+      승인번호의 앞자리 0 은 CSV 에서 엑셀이 숫자로 바꿔 지울 수 있으니, 그대로 남아야 하는 자료는 JSON 백업을 쓰세요.
     </p>
     <div class="table-scroll">
       <table>
         <thead>
           <tr>
-            <th scope="col">지출일</th><th scope="col">거래처</th><th scope="col">금액</th>
+            <th scope="col">지출일</th><th scope="col">거래처</th><th scope="col">승인번호</th><th scope="col">금액</th>
             <th scope="col">비목</th><th scope="col">결제경로</th><th scope="col">집행 기간</th>
             <th scope="col">증빙 종류</th><th scope="col">수취</th><th scope="col">제출</th>
             <th scope="col">메모</th><th scope="col" class="no-print"><span aria-hidden="true">지우기</span></th>
           </tr>
         </thead>
-        <tbody data-rows><tr><td colspan="11" class="muted">아직 입력이 없습니다.</td></tr></tbody>
+        <tbody data-rows><tr><td colspan="12" class="muted">아직 입력이 없습니다.</td></tr></tbody>
         <tfoot data-foot hidden>
-          <tr><th scope="row">합계</th><td></td><td data-foot-amount></td><td colspan="8"></td></tr>
+          <tr><th scope="row">합계</th><td></td><td></td><td data-foot-amount></td><td colspan="8"></td></tr>
         </tfoot>
       </table>
     </div>
@@ -354,6 +427,17 @@ const backupLimit = [
   } from '../lib/receipts';
   import { buildBundle, bundleFileName, dataPeriod } from '../lib/bundle';
   import {
+    buildReport,
+    normalizeReportMeta,
+    reportBlankCount,
+    reportFileName,
+    reportGaps,
+    reportToHtml,
+    type Report,
+    type ReportMeta
+  } from '../lib/report';
+  import { buildDocx, docxSupport } from '../lib/docx';
+  import {
     cardSettingsToOptions,
     formatBudgetRuleLines,
     importCardFile,
@@ -369,6 +453,7 @@ const backupLimit = [
     backupFileName,
     clearEntries,
     hasCardSettings,
+    hasReportMeta,
     isBackupFileTooLarge,
     loadStateDetailed,
     MAX_BACKUP_BYTES,
@@ -379,6 +464,7 @@ const backupLimit = [
     saveCardSettings,
     saveEntries,
     saveMeta,
+    saveReportMeta,
     serializeState,
     STORAGE_KEY,
     type RestoreRejection
@@ -444,8 +530,7 @@ const backupLimit = [
       return val(id).trim();
     }
 
-    function download(name: string, text: string, type: string) {
-      const blob = new Blob([text], { type });
+    function deliver(name: string, blob: Blob) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -454,6 +539,15 @@ const backupLimit = [
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    function download(name: string, text: string, type: string) {
+      deliver(name, new Blob([text], { type }));
+    }
+
+    /** 바이트 산출물(DOCX)용. Blob 생성자가 타입스크립트에서 Uint8Array 를 바로 받지 않아 사본을 만들어 넘깁니다. */
+    function downloadBytes(name: string, bytes: Uint8Array, type: string) {
+      deliver(name, new Blob([bytes.slice().buffer as ArrayBuffer], { type }));
     }
 
     function cell(text: string, bold = false): HTMLElement {
@@ -547,6 +641,7 @@ const backupLimit = [
           const tr = document.createElement('tr');
           tr.appendChild(cell(e.date));
           tr.appendChild(cell(e.vendor || '-'));
+          tr.appendChild(cell(e.approvalNo || '-'));
           tr.appendChild(cell(formatKRW(e.amount), true));
           tr.appendChild(cell(e.budgetItem));
           tr.appendChild(cell(e.evidenceState));
@@ -558,12 +653,13 @@ const backupLimit = [
       if (rowsBody) {
         rowsBody.textContent = '';
         if (list.length === 0) {
-          rowsBody.appendChild(emptyRow(11, '조건에 맞는 입력이 없습니다.'));
+          rowsBody.appendChild(emptyRow(12, '조건에 맞는 입력이 없습니다.'));
         }
         for (const e of list) {
           const tr = document.createElement('tr');
           tr.appendChild(cell(e.date));
           tr.appendChild(cell(e.vendor || '-'));
+          tr.appendChild(cell(e.approvalNo || '-'));
           tr.appendChild(cell(formatKRW(e.amount)));
           tr.appendChild(cell(e.budgetItem));
           tr.appendChild(cell(e.payMethod));
@@ -664,6 +760,7 @@ const backupLimit = [
         id: makeId(),
         date: field('f-date'),
         vendor: field('f-vendor'),
+        approvalNo: field('f-approval'),
         amount,
         budgetItem: field('f-budget'),
         payMethod: val('f-pay'),
@@ -685,9 +782,11 @@ const backupLimit = [
         formMsg.textContent = `${entry.date} · ${entry.vendor || '이름 없음'} ${formatKRW(entry.amount)} · ${entry.budgetItem} 추가됨`;
       }
       const vendor = input<HTMLInputElement>('f-vendor');
+      const approval = input<HTMLInputElement>('f-approval');
       const amountInput = input<HTMLInputElement>('f-amount');
       const memo = input<HTMLInputElement>('f-memo');
       if (vendor) vendor.value = '';
+      if (approval) approval.value = '';
       if (amountInput) amountInput.value = '';
       if (memo) memo.value = '';
       vendor?.focus();
@@ -772,7 +871,146 @@ const backupLimit = [
       if (status) status.textContent = `${name} · ${visible.length}건으로 꾸러미 생성 (화면에 표시된 결과만, 브라우저 안에서 조립 — 전송 없음)`;
     });
 
-    /** 필터 DOM 과 상태(filters)를 한 번에 초기화 — 두어가 어긋나는 창을 없앱니다. */
+    /* ───────── 보고서 내보내기 (HTML · 인쇄로 PDF) ───────── */
+    /** 칸 목록은 화면이 아니라 REPORT_FIELDS 에서 만들어 렌더링한 DOM 에서 읽습니다(두 곳이 갈라지지 않게). */
+    const REPORT_KEYS: string[] = Array.from(root.querySelectorAll<HTMLElement>('[data-report-field]'))
+      .map((n) => n.dataset.reportField ?? '')
+      .filter((k) => k !== '');
+    const metaOf = (m: ReportMeta) => m as unknown as Record<string, string>;
+    const repNode = (key: string) => root.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[data-report-field="${key}"]`);
+    const reportNote = el('report-note');
+    const reportGapsBox = el('report-gaps');
+    const reportGapList = el('report-gap-list');
+
+    function metaFromInputs(): ReportMeta {
+      const raw: Record<string, string> = {};
+      for (const f of REPORT_KEYS) raw[f] = repNode(f)?.value ?? '';
+      return normalizeReportMeta(raw);
+    }
+
+    function hydrateMetaInputs() {
+      for (const f of REPORT_KEYS) {
+        const node = repNode(f);
+        if (node) node.value = metaOf(state.reportMeta)[f] ?? '';
+      }
+    }
+
+    /** 채워 받지 않은 필수 칸만 모아 보여줍니다 — 보고서가 〔채우기〕 채로 나가기 직전에 보이는 창입니다. */
+    function renderReportGaps(meta: ReportMeta = state.reportMeta) {
+      if (!reportGapsBox || !reportGapList) return;
+      const missing = reportGaps(meta);
+      reportGapsBox.hidden = missing.length === 0;
+      reportGapList.textContent = '';
+      for (const g of missing) {
+        const li = document.createElement('li');
+        li.textContent = `${g.label} — ${g.hint}`;
+        reportGapList.appendChild(li);
+      }
+    }
+
+    el('report-save')?.addEventListener('click', () => {
+      const res = saveReportMeta(metaFromInputs());
+      state.reportMeta = res.meta;
+      hydrateMetaInputs();
+      renderReportGaps(res.meta);
+      if (reportNote)
+        reportNote.textContent = res.future
+          ? '더 새로운 형식 데이터라 저장하지 않았습니다.'
+          : res.ok
+            ? '보고서 정보를 이 브라우저에 저장했습니다. 다음 보고서·JSON 백업에도 그대로 들어갑니다.'
+            : '저장소에 쓰지 못했습니다. 이번 세션에서는 화면 값으로 보고서를 만들 수 있습니다.';
+    });
+
+    /**
+     * 입력창을 고치는 동안에도 「이것만 채워 주세요」 목록이 따라옵니다. 저장을 누르기 전에도 화면이 문서와
+     * 같은 것을 보게 두는 일입니다 — 목록이 저장된 값만 보면, 적어 놓고 안 누른 칸은 화면에서는 사라지고 문서에는 〔채우기〕 로 남습니다.
+     */
+    root.addEventListener('input', (event) => {
+      const target = event.target;
+      if (target instanceof HTMLElement && target.closest('[data-report-card]')) renderReportGaps(metaFromInputs());
+    });
+
+    /**
+     * 화면 상태(필터·**입력창에 지금 적힌 값**)로 보고서를 조립합니다. HTML · DOCX 가 같은 재료를 쓰도록 한 곳에 두었습니다 —
+     * 두 파일이 서로 다른 행·숫자를 담는 사고를 구조로 막습니다.
+     * 「저장」을 누르지 않은 입력도 그대로 들어갑니다(버튼은 다음 방문을 위해 남기는 일이고, 내보내기는 지금 화면의 값입니다).
+     */
+    function reportFromScreen(): { report: Report; period: string; count: number } | null {
+      const visible = filterEntries(state.entries, filters);
+      if (visible.length === 0) {
+        if (status) {
+          status.textContent =
+            state.entries.length > 0
+              ? '필터 조건에 맞는 건이 없어 보고서를 만들 수 없습니다. 필터를 해제하거나 기간을 넓혀 주세요.'
+              : '지출 항목을 먼저 입력해 주세요.';
+        }
+        return null;
+      }
+      const meta = metaFromInputs();
+      // 정산 기간은 보고서 머리에 적는 시작·종료가 1 순위입니다. 그 값이 없을 때만 화면 필터 기간,
+      // 그것도 없으면 행에서 구한 최소~최대 달을 뒷값으로 씁니다 — 문서 머리와 파일 이름이 서로 다른
+      // 기간을 말하지 않도록 순서를 한쪽에 고정해 둡니다(`buildReport` 의 precedence 가 이 순서입니다).
+      const hasMetaPeriod = meta.periodFrom !== '' || meta.periodTo !== '';
+      const fallbackPeriod = filters.from || filters.to ? exportPeriod(filters) : dataPeriod(visible);
+      const report = buildReport({
+        entries: visible,
+        meta,
+        period: hasMetaPeriod ? '' : fallbackPeriod,
+        generatedAt: new Date()
+      });
+      // 파일 이름은 문서에 적힌 기간을 씁니다(이름과 문서가 다른 기간으로 갈라지지 않게).
+      return { report, period: report.period, count: visible.length };
+    }
+
+    /** 산출물 공통 고지: 마지막 내보내기 시각을 남기고 건수·문서에 실제로 남은 빈칸 개수를 한 문장으로 알려줍니다. */
+    function finishReportExport(name: string, made: { report: Report; count: number }, kind: string): string {
+      state.lastExportAt = new Date().toISOString();
+      saveMeta({ lastExportAt: state.lastExportAt });
+      // 화면이 따로 세지 않고, 방금 만든 문서의 칸을 셉니다(고지한 개수와 파일 안의 〔채우기〕 가 항상 같습니다).
+      const missing = reportBlankCount(made.report);
+      return `${name} · ${made.count}건으로 ${kind} 보고서 생성 (화면에 표시된 결과만, 브라우저 안에서 조립 — 전송 없음)${
+        missing > 0 ? ` · 입력창에 값이 없는 ${missing}칸은 문서에 〔채우기〕로 남았습니다` : ''
+      }`;
+    }
+
+    el('export-report-html')?.addEventListener('click', () => {
+      const made = reportFromScreen();
+      if (!made) return;
+      const name = `${reportFileName(made.period)}.html`;
+      download(name, reportToHtml(made.report), 'text/html;charset=utf-8');
+      if (status) status.textContent = finishReportExport(name, made, 'HTML');
+    });
+
+    el('export-report-docx')?.addEventListener('click', async (event) => {
+      const button = event.currentTarget as HTMLButtonElement;
+      const support = docxSupport();
+      if (!support.ok) {
+        if (status) status.textContent = support.why;
+        return;
+      }
+      const made = reportFromScreen();
+      if (!made) return;
+      const label = button.textContent ?? '보고서 DOCX 내보내기';
+      button.disabled = true; // 조립은 압축을 기다리는 일이라 두 번 누르면 파일이 두 개 나옵니다.
+      button.textContent = 'DOCX 조립 중…';
+      try {
+        const bytes = await buildDocx(made.report);
+        const name = `${reportFileName(made.period)}.docx`;
+        downloadBytes(name, bytes, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        if (status) status.textContent = finishReportExport(name, made, 'DOCX');
+      } catch (error) {
+        if (status)
+          status.textContent =
+            error instanceof Error && error.message
+              ? `DOCX 조립에 실패했습니다: ${error.message} (HTML 은 그대로 만들 수 있습니다)`
+              : 'DOCX 를 만들지 못했습니다. 보고서 HTML 을 사용해 주세요.';
+      } finally {
+        button.disabled = false;
+        button.textContent = label;
+      }
+    });
+
+    /** 필터 DOM 과 상태(filters)를 한 번에 초기화 — 두개가 어긋나는 창을 없앱니다. */
     function resetFilterControls() {
       for (const id of FILTER_IDS) {
         const node = input<HTMLInputElement | HTMLSelectElement>(id);
@@ -835,20 +1073,24 @@ const backupLimit = [
         droppedCount = dropped;
         resetFilterControls();
         // 복원은 목록 전체를 대체합니다(다른 탭 행과 병합하지 않음). 체크리스트는 저장된 값 그대로 둡니다.
-        // 수입 설정은 예외로 파일 값을 받아들입니다 — 규칙 없는 오래된 백업이면 지금 값이 남고, 그 판단은 replaceEntries 가 돌려줍니다.
-        const res = replaceEntries(state.entries, undefined, Date.now(), restored.cardSettings);
+        // 수입 설정·보고서 머리는 예외로 파일 값을 받아들입니다 — 값 없는 오래된 백업이면 지금 값이 남고, 그 판단은 replaceEntries 가 돌려줍니다.
+        const res = replaceEntries(state.entries, undefined, Date.now(), restored.cardSettings, restored.reportMeta);
         writeBlocked = res.future;
         state.restoreAt = res.restoreAt;
         state.cardSettings = res.cardSettings;
+        state.reportMeta = res.reportMeta;
         hydrateSettingsInputs();
+        hydrateMetaInputs();
+        renderReportGaps();
         if (warning) warning.hidden = res.ok;
         showLoadNote();
         render();
         const skipped = dropped > 0 ? ` · 형식 오류 ${dropped}건은 건너뜀` : '';
         const settingsNote = hasCardSettings(restored.cardSettings) ? '· 파일의 수입 규칙을 적용' : '· 수입 규칙은 이 브라우저 값 유지';
+        const metaNote = hasReportMeta(restored.reportMeta) ? '· 파일의 보고서 정보를 적용' : '· 보고서 정보는 이 브라우저 값 유지';
         if (status)
           status.textContent = res.ok
-            ? `복원 완료 · ${state.entries.length}건${skipped} · ${settingsNote}`
+            ? `복원 완료 · ${state.entries.length}건${skipped} · ${settingsNote} · ${metaNote}`
             : `저장소에 쓰지 못했습니다 · 화면만 ${state.entries.length}건으로 바꿨습니다. 백업·다른 탭 저장 상태와 다를 수 있습니다.`;
         fileInput.value = '';
       };
@@ -928,6 +1170,8 @@ const backupLimit = [
       if (rules) rules.value = formatBudgetRuleLines(s.budgetRules);
     }
     hydrateSettingsInputs();
+    hydrateMetaInputs();
+    renderReportGaps();
 
     function showImpError(lines: string[]): void {
       if (!impError) return;
@@ -986,6 +1230,7 @@ const backupLimit = [
         for (const text of [
           e.date,
           e.vendor || '(거래처 없음)',
+          e.approvalNo || '—',
           formatKRW(e.amount),
           e.budgetItem || '(비목 미정)',
           e.payMethod,
@@ -998,7 +1243,7 @@ const backupLimit = [
       if (fresh.length > PREVIEW_ROWS) {
         const tr = document.createElement('tr');
         const td = document.createElement('td');
-        td.colSpan = 7;
+        td.colSpan = 8;
         td.className = 'muted';
         td.textContent = `외 ${fresh.length - PREVIEW_ROWS}건 — 추가를 누르면 미리보지 않은 행까지 한 번에 들어갑니다`;
         tr.appendChild(td);
@@ -1046,7 +1291,7 @@ const backupLimit = [
         if (result.entries.length === 0) {
           showImpError([
             '이 파일에서는 집행 행을 한 건도 읽지 못했습니다. 위에서 알려준 사유를 확인해 주세요.',
-            '위에서 알려준 사유를 확인해 주세요. 행을 못 읽은 상태에서 목록에는 아무것도 들어가지 않았습니다.'
+            '읽은 행이 하나도 없는 상태이므로 집행 목록에는 아무것도 들어가지 않았습니다.'
           ]);
         } else if (impSettings && result.gaps.some((g) => g.kind !== 'evidence-unread')) {
           // 답할 칸이 닫힌 채 목록만 보여 주지 않도록, 정할 것이 남아 있으면 설정 상자를 엽니다.
@@ -1061,10 +1306,10 @@ const backupLimit = [
           /\.xlsx?$/i.test(file.name)
             ? ' .xlsx 는 브라우저가 zip 압축을 풀어 읽습니다(Chrome 103 · Safari 16.4 · Firefox 113 이후). 이 브라우저에서 그 기능이 안 돌아가면 엑셀에서 CSV 또는 TSV로 저장해 넣어 주세요 — CSV 는 압축 없이 읽힙니다.'
             : '';
-        showImpError([`파일을 읽지 못했습니다: ${reason}${xlsxHint}`, '읽기에 실패한 파일은 목록에 아무것도 넣지 않았습니다.']);
+        showImpError([`파일을 읽지 못했습니다: ${reason}${xlsxHint}`, '읽기에 실패한 파일은 집행 목록에 한 행도 넣지 않았습니다.']);
         if (status) status.textContent = `${file.name} 읽기에 실패했습니다.`;
       } finally {
-        // 같은 파일을 다시 고르기도/change 가 걸리게 입력란은 비웁니다.
+        // 입력란을 비워 둡니다 — 같은 파일을 다시 골라도 change 가 걸립니다.
         if (impFile) impFile.value = '';
       }
     }
@@ -1156,6 +1401,10 @@ const backupLimit = [
         state = fresh.state;
         trimmedCount = 0;
         droppedCount = fresh.dropped;
+        // 목록이 통째로 바뀐만큼 수입 설정·보고서 머리 입력도 그쪽 값으로 맞춥니다(화면과 상태가 어긋난 채로 입력되지 않게).
+        hydrateSettingsInputs();
+        hydrateMetaInputs();
+        renderReportGaps();
         showLoadNote();
         render();
         if (status) status.textContent = '다른 탭에서 목록을 복원했습니다. 이 화면도 그 내용으로 바꿨습니다.';

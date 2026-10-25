@@ -15,8 +15,11 @@
  *           조용히 지우면 지운 행이 되살아나고 남의 복원을 덮어씁니다. 그래서 아예 쓰기를 막습니다.
  *   3 → 4 : 카드사 명세서 수입 설정(cardSettings) 도입 — 지난 달에 정해 둔 전용카드 끝번호·집행기간·
  *           가맹점→비목 규칙을 다음 달 파일에 자동 적용하려면 지출 행과 함께 백업돼야 합니다.
+ *   4 → 5 : 지출 행에 승인번호(approvalNo) 별도 칸 도입 — 승인번호가 메모 글자 속에 파묻혀 있으면
+ *           정산 꾸러미·CSV 에서 조회 열로 쓰지 못합니다. v4 저장본에는 이 칸이 없으니 빈 문자열로
+ *           승격하고, 이 사이트 수입기가 만든 행(id 가 `sa-숫자`)은 그 숫자에서 승인번호를 되찾습니다.
  */
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 /** 결제(지출) 경로. v1 의 모호한 '카드' 값은 마이그레이션에서 '확인 필요' 로 보정됩니다. */
 export const PAY_METHODS = [
@@ -88,6 +91,8 @@ export interface ReceiptEntry {
   /** YYYY-MM-DD (지출일) */
   date: string;
   vendor: string;
+  /** 카드 승인번호. 앞자리 0 이 의미 있는 **문자열**이라 숫자로 바꾸지 않습니다. 모르면 빈 문자열. */
+  approvalNo: string;
   amount: number;
   budgetItem: string;
   payMethod: PayMethod;
@@ -116,6 +121,31 @@ export function makeId(now: number = Date.now()): string {
 
 function oneOf<T extends readonly string[]>(value: unknown, list: T, fallback: T[number]): T[number] {
   return list.includes(value as T[number]) ? (value as T[number]) : fallback;
+}
+
+/** 승인번호 칸 상한(글자). 명세서 승인번호보다 넉넉하게 두고, 지나치게 긴 값이 표를 못 하게 줄여 둡니다. */
+export const MAX_APPROVAL_CHARS = 24;
+
+/** 이 사이트 명세서 수입기가 만든 행의 id 는 `sa-<승인번호>` 입니다(앞자리 0 이 남은 숫자만). */
+const IMPORT_ID = /^sa-(\d{4,24})$/;
+
+/**
+ * v4 까지 승인번호는 칸이 없고 메모 글자(`승인 01234567 · 일시불 · …`) 속에만 있었습니다.
+ * 수입기가 만든 행의 id 는 `sa-<숫자>` 이지만, 그 숫자가 **항상 승인번호는 아닙니다** —
+ * 명세서에 승인번호가 없는 달에는 수입기가 조회번호·영수번호를 그 자리에 넣습니다(`cardimport.ts`).
+ * 그래서 메모에 `승인 <그 숫자>` 조각이 실제로 들어 있을 때만 새 칸으로 옮겨 쓰고 앞 조각을 지웁니다.
+ * 조건 없이 id 에서만 되살리면 사용자가 빈칸으로 지운 승인번호가 다음 저장에서 다시 살아나고,
+ * 승인번호 아닌 번호가 승인번호 열에 박힙니다. 손으로 입력·편집한 행(id 형식이 다름)은 절대 손대지 않습니다.
+ */
+function recoverApproval(id: string, approvalNo: string, memo: string): { approvalNo: string; memo: string } {
+  if (approvalNo) return { approvalNo, memo };
+  const fromId = IMPORT_ID.exec(id);
+  if (!fromId) return { approvalNo: '', memo };
+  const token = fromId[1];
+  const prefix = `승인 ${token}`;
+  if (memo === prefix) return { approvalNo: token, memo: '' };
+  if (memo.startsWith(`${prefix} · `)) return { approvalNo: token, memo: memo.slice(prefix.length + 3) };
+  return { approvalNo: '', memo };
 }
 
 const isPayMethod = (v: unknown) => (PAY_METHODS as readonly string[]).includes(v as string);
@@ -161,10 +191,15 @@ export function normalizeEntry(raw: unknown): ReceiptEntry | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
   const amount = Number(o.amount);
   if (!Number.isFinite(amount) || amount < 0) return null;
+  const id = typeof o.id === 'string' && o.id ? o.id : makeId();
+  const rawApproval = typeof o.approvalNo === 'string' ? o.approvalNo.trim().slice(0, MAX_APPROVAL_CHARS) : '';
+  const rawMemo = typeof o.memo === 'string' ? o.memo : '';
+  const approval = recoverApproval(id, rawApproval, rawMemo);
   return {
-    id: typeof o.id === 'string' && o.id ? o.id : makeId(),
+    id,
     date,
     vendor: typeof o.vendor === 'string' ? o.vendor.trim() : '',
+    approvalNo: approval.approvalNo,
     amount: Math.round(amount),
     budgetItem: typeof o.budgetItem === 'string' && o.budgetItem.trim() ? o.budgetItem.trim() : '기타',
     payMethod: oneOf(o.payMethod, PAY_METHODS, '확인 필요'),
@@ -172,7 +207,7 @@ export function normalizeEntry(raw: unknown): ReceiptEntry | null {
     evidenceState: oneOf(o.evidenceState, EVIDENCE_STATES, '미수취'),
     periodState: oneOf(o.periodState, PERIOD_STATES, '확인 필요'),
     submitState: oneOf(o.submitState, SUBMIT_STATES, '미제출'),
-    memo: typeof o.memo === 'string' ? o.memo : ''
+    memo: approval.memo
   };
 }
 
@@ -199,7 +234,7 @@ export function filterEntries(entries: ReceiptEntry[], f: Filters = {}): Receipt
     if (f.submitState && e.submitState !== f.submitState) return false;
     if (f.payMethod && e.payMethod !== f.payMethod) return false;
     if (q) {
-      const hay = `${e.vendor} ${e.memo} ${e.budgetItem}`.toLowerCase();
+      const hay = `${e.vendor} ${e.memo} ${e.budgetItem} ${e.approvalNo}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;
@@ -289,6 +324,7 @@ export const CSV_HEADER = [
   '지출일',
   '비목(예산과목)',
   '거래처',
+  '승인번호',
   '금액',
   '결제경로',
   '전용카드',
@@ -327,6 +363,9 @@ export function toCsvRows(entries: ReceiptEntry[]): string[][] {
     e.date,
     e.budgetItem,
     e.vendor,
+    // 승인번호는 앞자리 0 이 있는 문자열 그대로 씁니다. 다만 CSV 에는 형식 정보가 없어 엑셀이 숫자로 바꾸면
+    // 0 이 사라질 수 있습니다 — 숫자·순서가 그대로 남아야 하는 자료는 JSON 백업을 쓰세요(화면에도 적어 둡니다).
+    e.approvalNo,
     String(e.amount),
     e.payMethod,
     e.payMethod === '전용(체크)카드' ? 'Y' : 'N',

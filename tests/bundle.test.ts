@@ -7,6 +7,7 @@ function entry(over: Partial<ReceiptEntry> = {}): ReceiptEntry {
     id: 'x1',
     date: '2026-03-05',
     vendor: '원단상사',
+    approvalNo: '',
     amount: 120000,
     budgetItem: '재료비',
     payMethod: '전용(체크)카드',
@@ -25,7 +26,8 @@ const ITEMS = [
   { id: 'execute:gap', label: '증빙 공백 목록을 만들었다' }
 ];
 
-const NOW = new Date('2026-04-11T09:30:00+09:00');
+// 꾸러미 각인·파일 이름은 로컬 달력 값입니다. ISO 문자열로 고정하면 검사 시간대에 따라 하루가 밀리므로 부품으로 만듭니다.
+const NOW = new Date(2026, 3, 11, 9, 30, 0);
 
 describe('buildBundle — 빈 데이터', () => {
   it('기록이 없어도 아홉 절이 다 나오고 "없음" 으로 채운다', () => {
@@ -78,6 +80,22 @@ describe('buildBundle — 숫자는 사용자 데이터에서만', () => {
     expect(text).toContain('재요청함');
     expect(text).toContain('기간 외');
     expect(text).toContain('(거래처 미입력)');
+  });
+
+  it('세 표와 기관 요청 초안에 승인번호 열이 들어 있다 (카드사·기관 조회의 키)', () => {
+    const withApproval = [
+      entry({ id: 'x9', approvalNo: '01234567', evidenceState: '미수취', periodState: '기간 외' }),
+      entry({ id: 'x8', vendor: '번호 없는 곳', amount: 5000, evidenceState: '재요청함' })
+    ];
+    const out = buildBundle({ entries: withApproval, checklist: {}, items: ITEMS, period: '2026-03', generatedAt: NOW });
+    // 증빙 공백 · 기간 리스크 · 제출 전 · 요청 초안 네 표가 같은 열 순서를 씁니다.
+    expect(out.match(/지출일\s+거래처\s+승인번호\s+금액/g)?.length).toBeGreaterThanOrEqual(4);
+    expect(out).toContain('01234567');
+    // 빈 승인번호는 칸을 빼지 않고 줄표로 채웁니다 — 열이 어긋나 보이지 않도록.
+    const blank = out.split('\n').find((l) => l.includes('번호 없는 곳'));
+    expect(blank).toMatch(/번호 없는 곳\s+—\s+₩/);
+    const draft = buildRequestDraft(withApproval, { period: '2026-03', generatedAt: NOW });
+    expect(draft).toContain('01234567');
   });
 
   it('비목·결제경로·월별 합계 절에 사용자 값이 들어 있다', () => {

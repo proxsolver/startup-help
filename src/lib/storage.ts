@@ -13,6 +13,7 @@
  */
 import { SCHEMA_VERSION, sanitizeEntries, type ReceiptEntry } from './receipts';
 import { emptyCardSettings, normalizeCardSettings, type CardSettings } from './cardimport';
+import { emptyReportMeta, normalizeReportMeta, REPORT_FIELDS, type ReportMeta } from './report';
 
 export const STORAGE_KEY = 'startup-help/state/v1';
 
@@ -96,6 +97,8 @@ export interface AppState {
   lastExportAt: string | null;
   /** 카드사 명세서 수입 설정. 파일이 알려 주지 않아 사용자가 한 번 정한 값이라, 지출 행과 함께 백업됩니다. */
   cardSettings: CardSettings;
+  /** 보고서 머리(사업명·신청인·기관·정산 기간·연락처·특이사항). 지출 행과 달리 문서용 값이지만 같은 이유로 백업에 들어갑니다. */
+  reportMeta: ReportMeta;
 }
 
 export function emptyState(): AppState {
@@ -106,7 +109,8 @@ export function emptyState(): AppState {
     removed: [],
     restoreAt: null,
     lastExportAt: null,
-    cardSettings: emptyCardSettings()
+    cardSettings: emptyCardSettings(),
+    reportMeta: emptyReportMeta()
   };
 }
 
@@ -174,7 +178,9 @@ export function normalizeState(raw: unknown): { state: AppState; dropped: number
       restoreAt: typeof o.restoreAt === 'number' && Number.isFinite(o.restoreAt) ? o.restoreAt : null,
       lastExportAt: typeof o.lastExportAt === 'string' ? o.lastExportAt : null,
       // v3 까지의 저장본·백업에는 이 칸이 아예 없습니다 → 빈 설정으로 승격(추측 값으로 채우지 않습니다).
-      cardSettings: normalizeCardSettings(o.cardSettings)
+      cardSettings: normalizeCardSettings(o.cardSettings),
+      // v4 까지의 저장본에는 보고서 머리가 없습니다 → 빈 값으로 승격하고, 보고서에서 〔채우기〕 로 보여줍니다.
+      reportMeta: normalizeReportMeta(o.reportMeta)
     },
     dropped: Math.max(0, inputEntries.length - entries0.length),
     future
@@ -373,25 +379,65 @@ export function parseBackup(text: string): RestoreResult {
  * 대신 대체 시각(restoreAt)을 찍습니다. 이 값이 커지면 다른 탭은 자기가 들고 있던 삭제 기록을
  * 버리고 저장된 목록을 그대로 받아들입니다 — 복원된 행을 예전 삭제 기록이 지워버리는 사고 방지.
  *
- * `cardSettings` 는 예외적으로 파일 값을 받아들이니다(없으면 지금 설정 유지) — 지난 달에 정해 둔
- * 수입 규칙을 새 브라우저에서 다시 치받지 않아도 되게 만드는 것이 그 값의 존재 이유입니다.
+ * `cardSettings` · `reportMeta` 는 예외적으로 파일 값을 받아들이니다(비어 있으면 지금 값 유지) — 지난 달에 정해 둔
+ * 수입 규칙과 보고서 머리(사업명·신청인·기관)를 새 브라우저에서 다시 입력하지 않아도 되게 만드는 것이 그 값들의 존재 이유입니다.
  */
 export function replaceEntries(
   entries: readonly ReceiptEntry[],
   storage: Storage | undefined = getStorage(),
   at: number = Date.now(),
-  cardSettings?: CardSettings
-): { ok: boolean; future: boolean; restoreAt: number | null; cardSettings: CardSettings } {
+  cardSettings?: CardSettings,
+  reportMeta?: ReportMeta
+): { ok: boolean; future: boolean; restoreAt: number | null; cardSettings: CardSettings; reportMeta: ReportMeta } {
+  const fallbackSettings = normalizeCardSettings(cardSettings ?? emptyCardSettings());
+  const fallbackMeta = normalizeReportMeta(reportMeta ?? emptyReportMeta());
   if (!storage)
-    return { ok: false, future: false, restoreAt: null, cardSettings: normalizeCardSettings(cardSettings ?? emptyCardSettings()) };
+    return { ok: false, future: false, restoreAt: null, cardSettings: fallbackSettings, reportMeta: fallbackMeta };
   const stored = readStored(storage);
-  if (stored.future) return { ok: false, future: true, restoreAt: stored.state.restoreAt, cardSettings: stored.state.cardSettings };
+  if (stored.future)
+    return {
+      ok: false,
+      future: true,
+      restoreAt: stored.state.restoreAt,
+      cardSettings: stored.state.cardSettings,
+      reportMeta: stored.state.reportMeta
+    };
   const settings = cardSettings && hasCardSettings(cardSettings) ? cardSettings : stored.state.cardSettings;
-  const ok = saveState({ ...stored.state, entries: entries.slice(), removed: [], restoreAt: at, cardSettings: settings }, storage);
-  return { ok, future: false, restoreAt: ok ? at : stored.state.restoreAt, cardSettings: settings };
+  const meta = reportMeta && hasReportMeta(reportMeta) ? reportMeta : stored.state.reportMeta;
+  const ok = saveState(
+    { ...stored.state, entries: entries.slice(), removed: [], restoreAt: at, cardSettings: settings, reportMeta: meta },
+    storage
+  );
+  return {
+    ok,
+    future: false,
+    restoreAt: ok ? at : stored.state.restoreAt,
+    cardSettings: settings,
+    reportMeta: meta
+  };
 }
 
 /** 설정에 실제로 들어찬 칸이 하나라도 있는지 (빈 설정으로 지금 값을 덮어쓰지 않기 위한 판단). */
 export function hasCardSettings(s: CardSettings): boolean {
   return s.dedicatedCardTails.length > 0 || s.budgetRules.length > 0 || s.periodFrom !== '' || s.periodTo !== '';
+}
+
+/** 보고서 머리에 실제로 적힌 값이 하나라도 있는지 (빈 머리로 지금 값을 지우지 않기 위한 판단). */
+export function hasReportMeta(m: ReportMeta): boolean {
+  return REPORT_FIELDS.some((f) => m[f.key] !== '');
+}
+
+/**
+ * 보고서 머리만 저장합니다. 지출 행·수입 설정은 건드리지 않습니다(저장된 값을 다시 읽고 그 위에 얹습니다).
+ * 화면의 「이것만 채워 주세요」에 답한 값이 다음 보고서·백업까지 살아남게 하는 것이 목적입니다.
+ */
+export function saveReportMeta(
+  meta: ReportMeta,
+  storage: Storage | undefined = getStorage()
+): { ok: boolean; future: boolean; meta: ReportMeta } {
+  const next = normalizeReportMeta(meta);
+  if (!storage) return { ok: false, future: false, meta: next };
+  const stored = readStored(storage);
+  if (stored.future) return { ok: false, future: true, meta: stored.state.reportMeta };
+  return { ok: saveState({ ...stored.state, reportMeta: next }, storage), future: false, meta: next };
 }

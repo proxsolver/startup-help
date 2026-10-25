@@ -34,6 +34,7 @@ import {
   rowsFromGrid,
   type CardField
 } from '../src/lib/cardimport';
+import { MAX_APPROVAL_CHARS, normalizeEntry } from '../src/lib/receipts';
 
 /* ───────── 파일 대신 조립하는 zip ───────── */
 
@@ -316,12 +317,33 @@ describe('행 → 집행 항목 (알려 준 것만 적는다)', () => {
     expect(res.gaps.find((g) => g.kind === 'card-unknown')?.items).toEqual(['본인902*']);
   });
 
-  it('승인번호로 id 를 만들고 앞자리 0 을 메모에 보존한다', () => {
+  it('승인번호로 id 를 만들고 승인번호 칸에 앞자리 0 을 그대로 넣는다', () => {
     const res = mapRows(parsed.rows, {});
     expect(res.entries[0].id).toBe('sa-01234567');
-    expect(res.entries[0].memo).toContain('승인 01234567');
+    expect(res.entries[0].approvalNo).toBe('01234567');
+    // 예전에는 메모에 `승인 01234567` 로 파묻혔습니다 — 칸으로 옮겼으니 메모에는 두 번 적지 않습니다.
+    expect(res.entries[0].memo).not.toContain('승인');
     expect(res.entries[0].memo).toContain('일시불');
     expect(res.entries[0].memo).toContain('결제확정');
+  });
+
+  it('긴 승인번호는 화면 상한으로 자른다 — 미리보기·저장·reload 가 같은 id 를 갖습니다', () => {
+    // 붙여넣기·열 정합 실패로 승인번호 칸에 공백이나 긴 숫자가 들어오는 경우가 있습니다.
+    // receipts.normalizeEntry 는 MAX_APPROVAL_CHARS 로 자르므로, 수입 단계가 같은 상한을 쓰지 않으면
+    // 미리보기의 id(sa-잘린값) 와 저장 후 다시 읽은 id(sa-긴값) 가 어긋나 같은 행이 두 번 뜹니다.
+    const long = '0'.repeat(MAX_APPROVAL_CHARS + 12);
+    const rows = [
+      { date: '2026-10-05', vendor: '샘플원단', amount: '12,000', approvalNo: ` ${long} ` },
+      { date: '2026-10-06', vendor: '샘플물류', amount: '8,000', approvalNo: long.slice(0, MAX_APPROVAL_CHARS) }
+    ] as unknown as Record<CardField, string>[];
+    const res = mapRows(rows, {});
+    expect(res.entries[0].approvalNo).toHaveLength(MAX_APPROVAL_CHARS);
+    expect(res.entries[0].id).toBe(`sa-${long.slice(0, MAX_APPROVAL_CHARS)}`);
+    // 잘린 값이 저장 입구를 다시 통과해도 그대로입니다(수입 → 화면 → 저장 왕복 일치).
+    expect(normalizeEntry(res.entries[0])!.approvalNo).toBe(res.entries[0].approvalNo);
+    expect(normalizeEntry(res.entries[0])!.id).toBe(res.entries[0].id);
+    // 잘린 결과끼리 같으면 id 도 같습니다 — 같은 파일 재수입 시 중복이 되지 않습니다.
+    expect(res.entries[1].id).toBe(res.entries[0].id);
   });
 
   it('집행기간을 주면 기간 내·외가 계산되고, 없으면 확인 필요로 남는다', () => {

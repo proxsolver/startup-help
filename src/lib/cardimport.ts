@@ -13,7 +13,7 @@
  *  증빙종류는 카드전표로 두지만 수취상태는 **미수취** 가 기본입니다 — 명세서 자체가 전표 파일이 아니라서
  *  '원본 확보' 라고 자동 우기면 정산에서 가장 아픈 구멍을 이 사이트가 덮게 됩니다.
  */
-import type { ReceiptEntry } from './receipts';
+import { MAX_APPROVAL_CHARS, type ReceiptEntry } from './receipts';
 
 export type CardField =
   | 'date'
@@ -207,8 +207,7 @@ function periodStateOf(date: string, opt: ImportOptions): ReceiptEntry['periodSt
 
 function memoOf(row: Partial<Record<CardField, string>>): string {
   const bits: string[] = [];
-  // 승인번호는 앞자리 0이 의미 있는 문자열입니다(01234567 — 검사에서 쓰는 지어낸 값). 숫자로 바꾸면 사라지므로 그대로 옮깁니다.
-  if (row.approvalNo) bits.push(`승인 ${row.approvalNo}`);
+  // 승인번호는 이제 자체 칸으로 넣습니다(receipts.ReceiptEntry.approvalNo) — 메모에 같은 값을 두 번 적지 않습니다.
   if (row.usageKind) bits.push(row.usageKind);
   if (row.acquireState) bits.push(row.acquireState);
   if (row.industry) bits.push(row.industry);
@@ -244,11 +243,16 @@ export function mapRows(rows: Record<CardField, string>[], opt: ImportOptions = 
     if (!budgetItem && vendor) unmappedVendors.add(vendor);
     const method = payMethodOf(row, tails);
     if (method === '확인 필요' && row.cardLabel) unknownCards.add(row.cardLabel);
-    const key = row.approvalNo ? `sa-${row.approvalNo}` : `sa-${date}-${amount}-${vendor}`;
+    // 화면이 담는 최대 길이는 receipts 에 있습니다. 여기서 자르지 않으면 미리보기·저장·reload 세 곳이
+    // 서로 다른 승인번호를 갖게 되므로(길이가 다른 id ), 자른 값으로 id 와 칸을 함께 만듭니다.
+    const approval = (row.approvalNo ?? '').trim().slice(0, MAX_APPROVAL_CHARS);
+    const key = approval ? `sa-${approval}` : `sa-${date}-${amount}-${vendor}`;
     entries.push({
       id: key,
       date,
       vendor,
+      // 앞자리 0 이 의미 있는 문자열이라 그대로 옮깁니다(숫자로 바꾸면 0 이 사라짐). id 와 같은 값입니다.
+      approvalNo: approval,
       amount,
       budgetItem,
       payMethod: method,
@@ -293,10 +297,10 @@ export function withHeaders(result: ImportResult, headers: string[], unknown: st
 
 /**
  * 파일이 알려 주지 않아 사용자가 정해야 하는 것들. 브라우저 저장소에 `cardSettings` 로 들어갑니다.
- * 지출 행과 함께 백업·복원되야 새 브라우저에서도 지난 규칙이 그대로 돌아옵니다.
+ * 지출 행과 함께 백업·복원되어야 새 브라우저에서도 지난 규칙이 그대로 돌아옵니다.
  */
 export interface CardSettings {
-  /** 전용(체크)카드 끝번호·이름 조각. 빈 배열이면 결제경로를 아무 행도 단정하지 않습니다. */
+  /** 전용(체크)카드 끝번호·이름 조각. 빈 배열이면 어느 행의 결제경로도 단정하지 않습니다(전부 `확인 필요`). */
   dedicatedCardTails: string[];
   /** 협약 집행기간 ('' = 미지정) */
   periodFrom: string;

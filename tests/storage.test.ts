@@ -12,6 +12,7 @@ import {
   emptyState,
   getStorage,
   hasCardSettings,
+  hasReportMeta,
   isBackupFileTooLarge,
   isFutureSchema,
   loadState,
@@ -25,16 +26,25 @@ import {
   saveChecklist,
   saveEntries,
   saveMeta,
+  saveReportMeta,
   saveState,
   serializeState
 } from '../src/lib/storage';
 import { emptyCardSettings, MAX_CARD_RULES, normalizeCardSettings, type CardSettings } from '../src/lib/cardimport';
+import {
+  emptyReportMeta,
+  MAX_REPORT_FIELD_CHARS,
+  normalizeReportMeta,
+  REPORT_FIELDS,
+  type ReportMeta
+} from '../src/lib/report';
 import { SCHEMA_VERSION, type ReceiptEntry } from '../src/lib/receipts';
 
 const entry = (id: string, date: string, over: Partial<ReceiptEntry> = {}): ReceiptEntry => ({
   id,
   date,
   vendor: `거래처${id}`,
+  approvalNo: '',
   amount: 1000,
   budgetItem: '재료비',
   payMethod: '전용(체크)카드',
@@ -111,6 +121,7 @@ describe('saveState / loadState 왕복', () => {
       id: 'a',
       date: '2026-03-01',
       vendor: 'A',
+      approvalNo: '01234567',
       amount: 5000,
       budgetItem: '재료비',
       payMethod: '현금',
@@ -125,7 +136,30 @@ describe('saveState / loadState 왕복', () => {
     const back = loadState(storage);
     expect(back.entries[0].vendor).toBe('A');
     expect(back.entries[0].budgetItem).toBe('재료비');
+    // 승인번호는 앞자리 0 이 살아야 합니다(숫자로 round-trip 되면 0 이 사라짐).
+    expect(back.entries[0].approvalNo).toBe('01234567');
     expect(back.checklist['setup-01']).toBe(true);
+  });
+
+  it('v4 저장본(승인번호 칸이 없던 시절)을 읽을 때 칸을 만들고, 수입 행은 id 에서 번호를 되찾는다', () => {
+    // 화면·저장소가 v5 가 된 뒤에도 예전 저장본은 열립니다. 칸이 없던 행은 빈값, 이 사이트 수입기가 만든
+    // 행(id 가 `sa-숫자`)은 그 숫자로 되찾습니다 — 사용자가 직접 입력한 행은 추측해서 채우지 않습니다.
+    storage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        schemaVersion: 4,
+        entries: [
+          { id: 'sa-01234567', date: '2026-03-01', vendor: 'A', amount: 5000, budgetItem: '재료비', memo: '승인 01234567 · 일시불 · 결제확정' },
+          { id: 'rmanual', date: '2026-03-02', vendor: 'B', amount: 6000, budgetItem: '사무·운영', memo: '직접 적은 메모' }
+        ],
+        checklist: {}
+      })
+    );
+    const back = loadState(storage);
+    expect(back.entries[0].approvalNo).toBe('01234567');
+    expect(back.entries[0].memo).toBe('일시불 · 결제확정');
+    expect(back.entries[1].approvalNo).toBe('');
+    expect(back.entries[1].memo).toBe('직접 적은 메모');
   });
 
   it('v1 형태로 저장되어 있던 데이터도 읽어올 때 v2 로 승격된다', () => {
@@ -193,6 +227,7 @@ describe('백업 파일 형식', () => {
       id: 'z',
       date: '2026-01-09',
       vendor: '택배',
+      approvalNo: '',
       amount: 3000,
       budgetItem: '출장·교통',
       payMethod: '계좌이체',
@@ -686,5 +721,123 @@ describe('카드사 명세서 수입 설정 (v4)', () => {
     expect(hasCardSettings({ ...emptyCardSettings(), dedicatedCardTails: ['441'] })).toBe(true);
     expect(hasCardSettings({ ...emptyCardSettings(), budgetRules: [{ match: 'a', budgetItem: 'b' }] })).toBe(true);
     expect(hasCardSettings(settings())).toBe(true);
+  });
+});
+
+describe('보고서 머리 (v5)', () => {
+  const meta = (over: Partial<ReportMeta> = {}): ReportMeta => ({
+    projectName: '모두의 창업 샘플 사업',
+    applicant: '김샘',
+    agency: '신한은행 모두의 창업',
+    periodFrom: '2026-01-01',
+    periodTo: '2026-06-30',
+    contact: '000-0000-0000',
+    note: '첫째 줄\n둘째 줄',
+    ...over
+  });
+
+  it('v4 저장본에는 없던 칸이라 빈 머리로 승격된다 (사업명을 추측해 채우지 않는다)', () => {
+    const storage = asStorage();
+    storage.setItem(STORAGE_KEY, JSON.stringify({ schemaVersion: 4, entries: [entry('a', '2026-03-01')] }));
+    const { state, future } = readStored(storage);
+    expect(future).toBe(false);
+    expect(state.reportMeta).toEqual(emptyReportMeta());
+    expect(state.entries).toHaveLength(1);
+  });
+
+  it('normalize: 형식이 없으면 빈 머리, 칸 상한과 줄 규칙이 저장 입구에서도 적용된다', () => {
+    for (const bad of [null, undefined, 'x', 12, []]) expect(normalizeReportMeta(bad)).toEqual(emptyReportMeta());
+    const res = normalizeReportMeta({
+      projectName: '가'.repeat(MAX_REPORT_FIELD_CHARS + 40),
+      applicant: '  김샘  ',
+      agency: '기관',
+      periodFrom: '2026-1-1',
+      periodTo: '2026-06-30',
+      contact: 'x'.repeat(200),
+      note: `가\n\n\n\n나${' '.repeat(5)}`
+    });
+    expect(res.projectName).toHaveLength(MAX_REPORT_FIELD_CHARS);
+    expect(res.applicant).toBe('김샘');
+    expect(res.periodFrom).toBe(''); // 'YYYY-M-D' 는 입력란 값이 아니므로 미지정
+    expect(res.contact).toHaveLength(MAX_REPORT_FIELD_CHARS);
+    expect(res.note).toBe('가\n\n나'); // 4 개줄 → 두 줄, 꼬리 공백은 trim 으로 사라짐
+    expect(hasReportMeta(res)).toBe(true);
+  });
+
+  it('왕복: 저장 → 백업 직렬화 → 복원 해석까지 같은 값으로 살아남는다 (특이사항의 줄바꿈 포함)', () => {
+    const storage = asStorage();
+    const next = saveReportMeta(meta(), storage);
+    expect(next.ok).toBe(true);
+    expect(loadState(storage).reportMeta).toEqual(meta());
+    const parsed = parseBackup(serializeState(loadState(storage)));
+    expect(parsed.rejected).toBeNull();
+    expect(parsed.state!.reportMeta).toEqual(meta());
+    expect(parsed.state!.reportMeta.note).toBe('첫째 줄\n둘째 줄');
+  });
+
+  it('머리만 저장해도 지출 행·수입 설정·체크리스트는 그대로다 (다른 탭 결과 안 잃음)', () => {
+    const storage = asStorage();
+    const kept = { dedicatedCardTails: ['441'], periodFrom: '2026-01-01', periodTo: '', budgetRules: [] };
+    saveState({ ...emptyState(), entries: [entry('a', '2026-03-01')], checklist: { 'setup-01': true }, cardSettings: kept }, storage);
+    expect(saveReportMeta(meta({ contact: '' }), storage).ok).toBe(true);
+    const after = loadState(storage);
+    expect(after.entries.map((e) => e.id)).toEqual(['a']);
+    expect(after.checklist).toEqual({ 'setup-01': true });
+    expect(after.cardSettings).toEqual(kept);
+    expect(after.reportMeta.contact).toBe('');
+  });
+
+  it('더 새로운 형식 저장본에는 머리도 쓰지 않는다 (강등 방지)', () => {
+    const storage = asStorage();
+    storage.setItem(STORAGE_KEY, JSON.stringify({ schemaVersion: SCHEMA_VERSION + 1, entries: [] }));
+    const res = saveReportMeta(meta(), storage);
+    expect(res.ok).toBe(false);
+    expect(res.future).toBe(true);
+    expect(res.meta).toEqual(emptyReportMeta());
+    expect(JSON.parse(storage.getItem(STORAGE_KEY)!).schemaVersion).toBe(SCHEMA_VERSION + 1);
+  });
+
+  it('쓰기 실패(시크릿·용량 초과)는 false 로, 저장소가 없으면 그대로 실패', () => {
+    expect(saveReportMeta(meta(), asStorage(true)).ok).toBe(false);
+    expect(saveReportMeta(meta(), undefined).ok).toBe(false);
+    expect(saveReportMeta(meta(), undefined).meta).toEqual(normalizeReportMeta(meta()));
+  });
+
+  it('복원: 파일에 머리가 있으면 그 값이 이 브라우저 값을 대체한다', () => {
+    const storage = asStorage();
+    saveReportMeta(meta({ applicant: '이샘' }), storage);
+    const fromFile = meta({ applicant: '김샘' });
+    expect(replaceEntries([entry('a', '2026-03-01')], storage, 10, undefined, fromFile).ok).toBe(true);
+    expect(loadState(storage).reportMeta).toEqual(fromFile);
+  });
+
+  it('복원: 빈 머리로 온 백업이 지금 값을 지우지 못한다 (파라미터 생략도 동일)', () => {
+    const storage = asStorage();
+    const current = meta();
+    saveReportMeta(current, storage);
+    expect(replaceEntries([entry('a', '2026-03-01')], storage, 10, undefined, emptyReportMeta()).ok).toBe(true);
+    expect(loadState(storage).reportMeta).toEqual(current);
+    expect(replaceEntries([entry('b', '2026-03-02')], storage, 20).ok).toBe(true);
+    expect(loadState(storage).reportMeta).toEqual(current);
+  });
+
+  it('복원: 수입 설정만 있는 백업도 머리를 보존하고, 머리만 있는 백업도 설정을 보존한다', () => {
+    const storage = asStorage();
+    const currentMeta = meta();
+    const currentSettings = { dedicatedCardTails: ['441'], periodFrom: '', periodTo: '', budgetRules: [] };
+    saveReportMeta(currentMeta, storage);
+    saveCardSettings(currentSettings, storage);
+    expect(replaceEntries([entry('a', '2026-03-01')], storage, 10, currentSettings).ok).toBe(true);
+    expect(loadState(storage).reportMeta).toEqual(currentMeta);
+    expect(replaceEntries([entry('b', '2026-03-02')], storage, 20, undefined, currentMeta).ok).toBe(true);
+    expect(loadState(storage).cardSettings).toEqual(currentSettings);
+  });
+
+  it('hasReportMeta: 선택 칸 하나만 적혀도 true — 필수만 채운 값·하나도 안 채운 값 가림', () => {
+    expect(hasReportMeta(emptyReportMeta())).toBe(false);
+    expect(hasReportMeta(meta({ projectName: '', applicant: '', agency: '', periodFrom: '', periodTo: '' }))).toBe(true); // 연락처·특이사항만 남아도 저장할 값이 있음
+    for (const f of REPORT_FIELDS) expect(hasReportMeta({ ...emptyReportMeta(), [f.key]: '값' })).toBe(true);
+    // 날짜 칸은 normalize 에서 모양이 잘못되면 비워지므로, 빈 문자열만 들어온 머리는 false 입니다.
+    expect(hasReportMeta(normalizeReportMeta({ periodFrom: '2026-1-1' }))).toBe(false);
   });
 });
