@@ -1,40 +1,206 @@
-/* 모두의 창업 정산 도우미(비공식) — 전역 스타일. 의존성 없이 한 파일로 관리합니다. */
+/* 모두의 창업 정산 도우미(비공식) — 전역 스타일. 의존성 없이 한 파일로 관리합니다.
+ *
+ * 토큰은 3층입니다. 아래로 갈수록 의미가 넓고 위로 갈수록 값이 깁니다.
+ *   1층 원시값 — 색·크기의 리터럴. 화면 규칙에서는 색 리터럴을 읽지 않습니다.
+ *   2층 의미   — 면(surface)·글자(ink)·선(line)·강조(accent)·상태(ok/warn/danger).
+ *   3층 부품   — 카드·표·버튼·입력·안내가 소비하는 크기. 화면 규칙은 여기까지 참조합니다.
+ * 규칙 안에 하드코딩 값이 보이면 그 자리가 새어 나오는 곳입니다.
+ * 색 리터럴은 1층에만 적습니다(다크 모드도 1층의 다크 값을 2층에 다시 매핑합니다).
+ * 예외는 하나 — 테마를 따라가지 않는 인쇄의 종이 색(`@media print`)입니다.
+ */
 
 :root {
-  --bg: #ffffff;
-  --bg-soft: #f6f7f9;
-  --bg-card: #ffffff;
-  --ink: #16181d;
-  --ink-soft: #5d6472;
-  --line: #e3e6eb;
-  --brand: #1d5fd0;
-  --brand-soft: #eaf1fd;
-  --ok: #17694a;
-  --ok-soft: #e7f5ee;
-  --warn: #8a5a00;
-  --warn-soft: #fdf3e0;
-  --danger: #a3271f;
-  --radius: 12px;
-  --shadow: 0 1px 2px rgba(16, 20, 28, 0.05), 0 8px 24px rgba(16, 20, 28, 0.05);
+  /* ---------- 1층 · 원시값 ---------- */
+  --p-white: #ffffff;
+  --p-gray-50: #fafbfc;
+  --p-gray-100: #f5f6f8;
+  --p-gray-150: #f0f2f6;
+  --p-gray-200: #eef1f5;
+  --p-line: #e4e8ee;
+  --p-line-strong: #d6dce5;
+  --p-gray-500: #646b7a;
+  --p-gray-600: #4b5563;
+  --p-gray-900: #101623;
+  --p-blue-600: #1f56c9;
+  --p-blue-700: #17418f;
+  --p-blue-50: #eaf0fd;
+  --p-green-700: #0f6b4f;
+  --p-green-50: #e6f4ee;
+  --p-amber-700: #7a5200;
+  --p-amber-50: #fbf1dc;
+  --p-red-700: #9c2a20;
+  --p-red-50: #fbeae8;
+  /* 그림자는 오프셋·흐림이 아니라 색만 여기 있습니다. 겹이 두 개인 이유는 다크에서 농도를 다르게 쓰기 때문입니다(라이트는 같은 값). */
+  --p-shadow-near: rgba(16, 22, 34, 0.05);
+  --p-shadow-far: rgba(16, 22, 34, 0.05);
+
+  /* 다크 화면 원시값 — 아래 `prefers-color-scheme` 블록이 2층 이름을 이 값들로만 바꿔 끼웁니다. */
+  --p-dark-page: #14171c;
+  --p-dark-card: #1b1f27;
+  --p-dark-inset: #222731;
+  --p-dark-inset-strong: #2a3039;
+  --p-dark-ink-1: #e9ebf0;
+  --p-dark-ink-2: #b0b8c6;
+  --p-dark-ink-3: #97a1b1;
+  --p-dark-on-accent: #0b1220;
+  --p-dark-line: #2c323c;
+  --p-dark-line-strong: #3d4552;
+  --p-dark-accent: #7ab0ff;
+  --p-dark-accent-ink: #a8cbff;
+  --p-dark-accent-wash: #1b2740;
+  --p-dark-ok: #66d0a5;
+  --p-dark-ok-wash: #16291f;
+  --p-dark-warn: #f0c274;
+  --p-dark-warn-wash: #2a2314;
+  --p-dark-danger: #ff8f86;
+  --p-dark-danger-wash: #331a18;
+  --p-dark-shadow-near: rgba(0, 0, 0, 0.4);
+  --p-dark-shadow-far: rgba(0, 0, 0, 0.3);
+
+  /* ---------- 2층 · 의미 ---------- */
+  --page: var(--p-gray-100);
+  --card: var(--p-white);
+  --inset: var(--p-gray-50);
+  --inset-strong: var(--p-gray-150);
+  --chip: var(--p-gray-200);
+
+  --ink-1: var(--p-gray-900);
+  --ink-2: var(--p-gray-600);
+  --ink-3: var(--p-gray-500);
+  --on-accent: var(--p-white);
+
+  --line: var(--p-line);
+  --line-strong: var(--p-line-strong);
+
+  --accent: var(--p-blue-600);
+  --accent-ink: var(--p-blue-700);
+  --accent-wash: var(--p-blue-50);
+  --ok: var(--p-green-700);
+  --ok-wash: var(--p-green-50);
+  --warn: var(--p-amber-700);
+  --warn-wash: var(--p-amber-50);
+  --danger: var(--p-red-700);
+  --danger-wash: var(--p-red-50);
+
+  /* 그림자 색의 의미 — 가까운 겹은 물체 바로 아래, 먼 겹은 퍼지는 그림자입니다. 3층이 오프셋과 조립합니다. */
+  --shadow-near: var(--p-shadow-near);
+  --shadow-far: var(--p-shadow-far);
+
+  /* 본문 텍스트 대비 하한(4.5:1)을 이 값들이 결정합니다. 8화면 × 라이트/다크 실측 최저 5.16:1(라이트) · 5.74:1(다크) —
+     --ink-3 을 페이지 면 위에서 더 옅게 내리면 처음으로 어긋납니다(가장 옅한 자리는 집행 요약의 12px 항목 이름). */
+  --type-scale: 'Pretendard', 'Pretendard Variable', -apple-system, BlinkMacSystemFont,
+    'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', system-ui, sans-serif;
+  --type-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* ---------- 3층 · 부품 ---------- */
+  /* 타입 스케일 (16px 기준) */
+  --t-xs: 0.75rem; /* 12 */
+  --t-sm: 0.8125rem; /* 13 */
+  --t-md: 0.875rem; /* 14 */
+  --t-body: 1rem; /* 16 */
+  --t-lg: 1.125rem; /* 18 */
+  --t-xl: 1.375rem; /* 22 */
+  --t-2xl: 1.75rem; /* 28 */
+  --lh-body: 1.72;
+  --lh-tight: 1.3;
+  --lh-table: 1.55;
+  /* 개요 문장(첫 화면의 첫 단락)만 본문보다 한 칸 크게 씁니다. 스케일 단계 밖의 값이라 이름을 따로 두었습니다. */
+  --t-lede: 1.0625rem; /* 17px */
+
+  /* 여백 스케일 */
+  --g-1: 0.25rem;
+  --g-2: 0.5rem;
+  --g-3: 0.75rem;
+  --g-4: 1rem;
+  --g-5: 1.25rem;
+  --g-6: 1.5rem;
+  --g-8: 2rem;
+  --g-10: 2.5rem;
+
+  /* 셸 · 헤더 — 본문의 기준 폭입니다.
+     카드 안 976px 이 여기서 시작합니다: 셸 1080 − 거터 32×2 = 1016, − 카드 좌우 안쪽 여백 1.2rem×2 − 테두리 2
+     = 976(1440px 실측). 거터는 화면 너비 4vw 이 2rem 에 닿는 800px 이상에서 32px 로 고정됩니다.
+     헤더는 한 줄일 때 59px(1440px 실측, 테두리 1 포함), 두 줄로 접히면 107px(360·780px 실측). */
+  --shell: 1080px;
+  --gutter: clamp(1rem, 4vw, 2rem);
+  --header-min: 58px;
+
+  /* 모서리 · 그림자 · 선 */
+  --r-sm: 8px;
+  --r-ctl: 10px;
+  --r-card: 12px;
+  --r-panel: 14px;
+  --r-pill: 999px;
+  --sh-1: 0 1px 2px var(--shadow-near);
+  --sh-2: 0 1px 2px var(--shadow-near), 0 6px 18px var(--shadow-far);
+
+  /* 카드 */
+  /* --card-pad 의 좌우 1.2rem 은 그대로 둡니다 — 셸 1016 − 패딩 38.4 − 테두리 2 = 카드 안 976px
+     라는 README·주석의 기준 숫자가 이 값에서 나왔습니다. 세로만 조금 늘렸습니다. */
+  --card-pad: 1.2rem 1.2rem;
+  --card-gap: var(--g-4);
+
+  /* 표 */
+  --fs-table: var(--t-sm);
+  --fs-th: var(--t-xs);
+  --th-bg: var(--inset);
+  --th-ink: var(--ink-2);
+  --cell-pad-y: 0.5rem;
+  --cell-pad-x: 0.6rem;
+  --num: tabular-nums;
+  /* 열 수별 최소 너비(실측 절차는 README의 「반응형·인쇄 관점」). 값이 이 층에 있으니
+     표 규칙은 열 수만 보고 크기를 고르고, 화면이 넓어질 때 어디를 손볼지 한 곳에서 보입니다.
+     3열 표에는 값이 없습니다 — 열이 적어 머리글이 감기기 전에 칸 안이 먼저 남습니다.
+     열 수는 이 사이트 표에 실제로 있는 개수만 나열했습니다(전 라우트 실측: 2·3·4·6·7·8·12열). */
+  --tw-4: 28rem; /* 448px · 본문 4열 표 */
+  --tw-6: 44rem; /* 704px · 캘린더 6열 — 40rem(640px) 으로 내리면 설명 칸이 51줄까지 쌓였습니다(360px 실측) */
+  --tw-7: 44rem; /* 704px · 재요청 목록 7열 */
+  --tw-8: 44rem; /* 704px · 명세서 미리보기 8열 — 값은 7열과 같게 실측됐습니다 */
+  --tw-12: 58rem; /* 928px · 지출 목록 12열(가장 넓음) */
+
+  /* 입력 · 버튼 */
+  --ctl-pad-y: 0.5rem;
+  --ctl-pad-x: 0.7rem;
+  --ctl-bg: var(--card);
+  --btn-pad-y: 0.55rem;
+  --btn-pad-x: 1.05rem;
+
+  /* 안내 */
+  --note-pad: 0.9rem 1.1rem;
+  --note-bar: 3px;
+
   --measure: 68ch;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #14161a;
-    --bg-soft: #1b1e24;
-    --bg-card: #1b1e24;
-    --ink: #e8eaee;
-    --ink-soft: #a2abb9;
-    --line: #2b3038;
-    --brand: #7ab0ff;
-    --brand-soft: #1c2740;
-    --ok: #66d0a5;
-    --ok-soft: #162b23;
-    --warn: #f0c274;
-    --warn-soft: #2b2415;
-    --danger: #ff8f86;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3);
+    /* 2층 이름만 바꿔 끼웁니다. 값은 전부 1층에 있고 화면 규칙은 3층까지의 이름만 참조하므로 화면은 여기만 따라옵니다. */
+    --page: var(--p-dark-page);
+    --card: var(--p-dark-card);
+    --inset: var(--p-dark-inset);
+    --inset-strong: var(--p-dark-inset-strong);
+    --chip: var(--p-dark-inset-strong);
+
+    --ink-1: var(--p-dark-ink-1);
+    --ink-2: var(--p-dark-ink-2);
+    --ink-3: var(--p-dark-ink-3);
+    --on-accent: var(--p-dark-on-accent);
+
+    --line: var(--p-dark-line);
+    --line-strong: var(--p-dark-line-strong);
+
+    --accent: var(--p-dark-accent);
+    --accent-ink: var(--p-dark-accent-ink);
+    --accent-wash: var(--p-dark-accent-wash);
+    --ok: var(--p-dark-ok);
+    --ok-wash: var(--p-dark-ok-wash);
+    --warn: var(--p-dark-warn);
+    --warn-wash: var(--p-dark-warn-wash);
+    --danger: var(--p-dark-danger);
+    --danger-wash: var(--p-dark-danger-wash);
+
+    --shadow-near: var(--p-dark-shadow-near);
+    --shadow-far: var(--p-dark-shadow-far);
   }
 }
 
@@ -49,14 +215,14 @@ html {
   scroll-behavior: smooth;
 }
 
+/* 본문 면을 카드·입력면(흰색)보다 한 단계 내립니다. 테두리를 굳히지 않아도 카드가 제 자리를 찾습니다. */
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--ink);
-  font-family: 'Pretendard', 'Pretendard Variable', -apple-system, BlinkMacSystemFont,
-    'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', system-ui, sans-serif;
-  font-size: 16px;
-  line-height: 1.7;
+  background: var(--page);
+  color: var(--ink-1);
+  font-family: var(--type-scale);
+  font-size: var(--t-body);
+  line-height: var(--lh-body);
   word-break: keep-all;
   overflow-wrap: anywhere;
 }
@@ -64,9 +230,10 @@ body {
 h1,
 h2,
 h3 {
-  line-height: 1.3;
+  line-height: var(--lh-tight);
   letter-spacing: -0.01em;
   font-weight: 700;
+  text-wrap: balance;
 }
 h1 {
   font-size: clamp(1.6rem, 1.2rem + 1.6vw, 2.25rem);
@@ -79,14 +246,14 @@ h2 {
   border-bottom: 1px solid var(--line);
 }
 h3 {
-  font-size: 1.1rem;
+  font-size: var(--t-lg);
   margin: 1.6em 0 0.5em;
 }
 p {
   margin: 0 0 1.1em;
 }
 a {
-  color: var(--brand);
+  color: var(--accent);
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
 }
@@ -94,11 +261,12 @@ a:hover {
   text-decoration: none;
 }
 code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--type-mono);
   font-size: 0.9em;
-  background: var(--bg-soft);
+  background: var(--inset);
+  border: 1px solid var(--line);
   padding: 0.1em 0.35em;
-  border-radius: 5px;
+  border-radius: var(--r-sm);
 }
 ul,
 ol {
@@ -108,37 +276,47 @@ li {
   margin: 0.35em 0;
 }
 :focus-visible {
-  outline: 3px solid var(--brand);
+  outline: 3px solid var(--accent);
   outline-offset: 2px;
   border-radius: 3px;
 }
+/* 격자·플렉스를 씌운 요소는 브라우저의 기본 display:none 을 자기 규칙으로 이깁니다.
+   도구 화면은 hidden 속성 하나로 판을 열고 닫으므로, 이 한 줄이 그 방어입니다. */
+[hidden] {
+  display: none !important;
+}
 
 .wrap {
-  max-width: 1080px;
+  max-width: var(--shell);
   margin-inline: auto;
-  padding-inline: clamp(1rem, 4vw, 2rem);
+  padding-inline: var(--gutter);
+}
+/* 본문 위 여백 — 헤더가 화면 위에 붙는 구조라도 첫 제목이 헤더 테두리에 달라붙지 않게 합니다.
+   개편 전 이 간격은 실측 0 이었고, 제목이 헤더의 1px 선에 곧바로 닿았습니다. */
+main {
+  padding-block-start: var(--g-5);
 }
 .measure {
   max-width: var(--measure);
 }
 .muted {
-  color: var(--ink-soft);
+  color: var(--ink-2);
 }
 .small {
-  font-size: 0.875rem;
+  font-size: var(--t-md);
 }
 .skip {
   position: absolute;
   left: -9999px;
 }
 .skip:focus {
-  left: 1rem;
-  top: 1rem;
+  left: var(--g-4);
+  top: var(--g-4);
   z-index: 99;
-  background: var(--bg);
-  padding: 0.5rem 0.9rem;
-  border-radius: 8px;
-  box-shadow: var(--shadow);
+  background: var(--card);
+  padding: var(--g-2) 0.9rem;
+  border-radius: var(--r-sm);
+  box-shadow: var(--sh-2);
 }
 
 /* ---------- 헤더 ---------- */
@@ -146,71 +324,78 @@ li {
   position: sticky;
   top: 0;
   z-index: 20;
-  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  background: color-mix(in srgb, var(--page) 88%, transparent);
   backdrop-filter: saturate(1.4) blur(8px);
   border-bottom: 1px solid var(--line);
 }
 .site-header .bar {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  min-height: 58px;
+  gap: var(--g-4);
+  min-height: var(--header-min);
 }
+/* 브랜드 이름은 한글입니다. 자간을 음수로 조이면 받침과 다음 글자의 초성이 서로 먹혀 들어
+   오히려 읽기 어려워지므로, 이 사이트의 다른 큰 글자(-0.01em)보다 여기서 한 발 물러납니다. */
 .brand {
   display: flex;
   align-items: center;
   gap: 0.55rem;
   font-weight: 800;
-  color: var(--ink);
+  color: var(--ink-1);
   text-decoration: none;
-  letter-spacing: -0.02em;
   white-space: nowrap;
 }
 .brand .mark {
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  background: var(--brand);
-  color: #fff;
-  font-size: 0.8rem;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-ctl);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: var(--t-sm);
+  font-weight: 800;
 }
 .site-nav {
   margin-left: auto;
   display: flex;
-  gap: 0.25rem;
+  gap: var(--g-1);
   align-items: center;
   flex-wrap: wrap;
 }
 .site-nav a {
-  color: var(--ink-soft);
+  color: var(--ink-2);
   text-decoration: none;
-  padding: 0.4rem 0.7rem;
-  border-radius: 999px;
-  font-size: 0.9rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: var(--r-pill);
+  font-size: var(--t-md);
   font-weight: 600;
+  white-space: nowrap;
 }
 .site-nav a:hover {
-  background: var(--bg-soft);
-  color: var(--ink);
+  background: color-mix(in srgb, var(--ink-1) 7%, transparent);
+  color: var(--ink-1);
 }
 .site-nav a[aria-current='page'] {
-  background: var(--brand-soft);
-  color: var(--brand);
+  background: var(--accent-wash);
+  color: var(--accent-ink);
 }
+/* 좁은 화면에서는 브랜드 아래로 메뉴를 내립니다. 링크 7 개가 한 줄에 다 들어가지 않기 때문입니다.
+   이때 헤더는 107px(360·780px 실측) 가 되고, 메뉴 줄은 좌우로 밀어서 봅니다 — 링크는 DOM 에 그대로
+   7 개가 있고 누르는 높이는 38px 로 좁은 화면에서도 같습니다. 780px 을 조금 넘는 폭(800px 실측 82px) 은
+   메뉴가 줄만 두 개로 접히고 밀림이 없어 누르지 못한 채로 전부 보입니다. */
 @media (max-width: 780px) {
   .site-nav {
     width: 100%;
     margin-left: 0;
     overflow-x: auto;
     flex-wrap: nowrap;
-    padding-bottom: 0.4rem;
+    padding-bottom: var(--g-2);
   }
   .site-header .bar {
     flex-wrap: wrap;
     min-height: 0;
-    padding-block: 0.5rem;
+    padding-block: var(--g-2);
   }
 }
 
@@ -219,61 +404,76 @@ li {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  font-size: 0.78rem;
+  font-size: var(--t-xs);
   font-weight: 700;
   padding: 0.15rem 0.55rem;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  color: var(--ink-soft);
-  background: var(--bg-soft);
+  border-radius: var(--r-pill);
+  border: 1px solid transparent;
+  color: var(--ink-2);
+  background: var(--chip);
   white-space: nowrap;
 }
 .badge.ok {
   color: var(--ok);
-  background: var(--ok-soft);
-  border-color: transparent;
+  background: var(--ok-wash);
 }
 .badge.warn {
   color: var(--warn);
-  background: var(--warn-soft);
-  border-color: transparent;
+  background: var(--warn-wash);
 }
 
+/* 안내는 강도를 두 단계로만 씁니다: 정보(파랑)·주의(amber). 왼쪽 3px 줄이 본문보다 먼저 눈에 들어오는 유일한 표시입니다. */
 .notice {
   border: 1px solid var(--line);
-  border-left: 4px solid var(--warn);
-  background: var(--warn-soft);
-  border-radius: var(--radius);
-  padding: 0.9rem 1.1rem;
-  margin: 1.5rem 0;
-  font-size: 0.92rem;
+  border-left: var(--note-bar) solid var(--warn);
+  background: var(--warn-wash);
+  border-radius: var(--r-card);
+  padding: var(--note-pad);
+  margin: var(--g-6) 0;
+  font-size: var(--t-md);
+  line-height: var(--lh-body);
 }
 .notice.info {
-  border-left-color: var(--brand);
-  background: var(--brand-soft);
+  border-left-color: var(--accent);
+  background: var(--accent-wash);
 }
 .notice strong {
   display: block;
-  margin-bottom: 0.25rem;
+  margin-bottom: var(--g-1);
+}
+/* 안내 판 안의 여러 줄(명세서 수입 실패 사유처럼 한 줄에 하나씩 쌓이는 메시지)은 이렇게 서습니다. */
+.notice .line {
+  display: block;
+}
+/* 접힌 덩어리(〈details〉)의 머리줄은 스스로 목표인 누르는 대상입니다.
+   손끝이 닿는 폭을 넓히고 커서를 띄워, 펼칠 수 있다는 것을 hover 밖에서도 보여줍니다. */
+summary {
+  cursor: pointer;
+  font-weight: 700;
+  padding-block: var(--g-2);
+}
+summary::-webkit-details-marker {
+  color: var(--ink-3);
 }
 
 /* ---------- 카드 ---------- */
 .grid {
   display: grid;
-  gap: 1rem;
+  gap: var(--card-gap);
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  margin: 1.2rem 0;
+  margin: var(--g-5) 0;
 }
 .card {
-  background: var(--bg-card);
+  background: var(--card);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 1.1rem 1.2rem;
-  box-shadow: var(--shadow);
+  border-radius: var(--r-card);
+  padding: var(--card-pad);
+  box-shadow: var(--sh-1);
 }
 .card h3 {
   margin: 0 0 0.4rem;
-  font-size: 1.02rem;
+  font-size: var(--t-body);
+  line-height: var(--lh-tight);
 }
 /* 카드 제목 링크는 그 카드로 가는 유일한 통로인데 글자 높이가 20px 라 24px 에 못 미칩니다.
    제목 줄 전체를 누르게 만듭니다 — 본문 문장 안에 묶인 링크와 달리 스스로 목표인 대상입니다.
@@ -284,35 +484,81 @@ li {
   margin-block: -0.3rem;
 }
 .card a {
-  color: var(--ink);
+  color: var(--ink-1);
   text-decoration: none;
 }
 .card a:hover {
-  color: var(--brand);
+  color: var(--accent);
 }
 .card p {
-  margin: 0;
-  font-size: 0.9rem;
-  color: var(--ink-soft);
+  margin-block-end: 0;
+  font-size: var(--t-md);
+  color: var(--ink-2);
 }
 
 /* ---------- 표 ---------- */
 table {
   width: 100%;
   border-collapse: collapse;
-  margin: 1.2rem 0;
-  font-size: 0.92rem;
+  margin: var(--g-5) 0;
+  font-size: var(--fs-table);
+  line-height: var(--lh-table);
+}
+caption {
+  /* 표 제목은 오른쪽 정렬된 채 표 위에 떠 다니는 브라우저 기본값을 쓰지 않습니다.
+     값(인라인 text-align·caption-side)을 이 한 곳으로 흡수합니다. */
+  text-align: left;
+  caption-side: top;
+  padding-block-end: var(--g-2);
+  font-weight: 600;
 }
 th,
 td {
   border-bottom: 1px solid var(--line);
-  padding: 0.6rem 0.55rem;
+  padding: var(--cell-pad-y) var(--cell-pad-x);
   text-align: left;
   vertical-align: top;
 }
 th {
   font-weight: 700;
-  background: var(--bg-soft);
+  font-size: var(--fs-th);
+  color: var(--th-ink);
+  background: var(--th-bg);
+  letter-spacing: 0;
+}
+/* 열이 일곱 개인 표부터는(화면에서만) 머리글을 한 줄로 세웁니다 — 이 표들은 열 이름이 짧아 최소 너비 안에서
+   한 줄에 서고(12열 실측: 표 928px 에 머리글 12칸 모두 1줄), 열이 여러 개 달린 표에서 머리가 꺾이면 어느 열인지
+   잃기 쉽습니다. 6열 이하에는 붙이지 않습니다. 캘린더에 이 규칙을 함께 걸면 「값이 확정되는 자리」 칸이 머리를
+   최소 폭으로 잡아 설명 열이 114px 까지 눌리고, 긴 칸이 14줄에서 30줄로 늘었습니다(360px 실측).
+   인쇄에는 이 규칙을 두지 않습니다 — 종이가 360px 까지 좁아져도 머리글이 감겨야 표가 페이지 안에 남습니다. */
+@media screen {
+  .table-scroll > table:has(th:nth-child(7)) th {
+    white-space: nowrap;
+  }
+}
+tbody tr:hover {
+  background: color-mix(in srgb, var(--accent) 4%, transparent);
+}
+/* 금액·건수 열. 지출 표는 열이 열두 개라 숫자가 세로로 딱 떨어지지 않으면 눈으로 합을 쫓을 수 없습니다. */
+.num {
+  font-variant-numeric: var(--num);
+  text-align: right;
+  white-space: nowrap;
+}
+/* 지출일·승인번호처럼 잘리면 의미가 깨지는 문자열 열. 왼쪽에 두고 줄만 바꾸지 않습니다. */
+.keep {
+  font-variant-numeric: var(--num);
+  white-space: nowrap;
+}
+.strong {
+  font-weight: 700;
+}
+tfoot td,
+tfoot th {
+  border-top: 2px solid var(--line-strong);
+  border-bottom: 0;
+  font-weight: 700;
+  background: var(--inset);
 }
 .table-scroll {
   overflow-x: auto;
@@ -320,24 +566,22 @@ th {
 }
 /* 열이 많은 표를 스크롤 없이 두면 좁은 화면에서 열이 찌그러집니다(실측: 4열 표 첫 열 41px,
    6열 캘린더 한 칸 161줄). 감당할 수 있는 열 너비를 먼저 확보하고 나머지는 밀어 보게 합니다.
-   rem 기준이라 글자 크기를 키우는 브라우저에서도 비율이 유지됩니다. */
+   rem 기준이라 글자 크기를 키우는 브라우저에서도 비율이 유지됩니다.
+   값은 표 토큰(--tw-*)에 있고, 각 값이 어디서 나왔는지는 README의 「반응형·인쇄 관점」에 있습니다. */
 .table-scroll > table:has(th:nth-child(4)) {
-  min-width: 34rem;
+  min-width: var(--tw-4);
 }
 .table-scroll > table:has(th:nth-child(6)) {
-  min-width: 44rem;
+  min-width: var(--tw-6);
 }
-.table-scroll > table:has(th:nth-child(9)) {
-  /* 61rem = 976px — 데스크톱 본문(카드 안) 너비와 같아서, 넓은 화면에서는 스크롤이 필요 없고
-     그 아래에서는 밀립니다(1440px/1024px 실측). */
-  min-width: 61rem;
+.table-scroll > table:has(th:nth-child(7)) {
+  min-width: var(--tw-7);
+}
+.table-scroll > table:has(th:nth-child(8)) {
+  min-width: var(--tw-8);
 }
 .table-scroll > table:has(th:nth-child(12)) {
-  /* 지출 목록(12열) — 승인번호가 자체 열이 된 뒤에 다시 잰 값입니다: 데스크톱 카드 안 본문 폭은
-     1008px(컨테이너 max-width 1080px − padding 48px − 카드 padding 24px)이고, 63rem = 1008px 로 두니
-     그 폭에서 표가 스크롤 없이 정확히 들어가고 머리글 12칸이 모두 한 줄로 남습니다(실측: 두 줄로 쌓인
-     머리글 0개). 64rem(1024px) 으로 올리면 넓은 화면에서도 16px 이 밀려서 이 값으로 둡니다. */
-  min-width: 63rem;
+  min-width: var(--tw-12);
 }
 /* 표 전체 폭을 확보해도 자동 레이아웃이 첫 열을 50~66px 로 눌러 버립니다(실측: 캘린더 항목명 50px,
    문서 표 첫 열 53px, 저장 방식 표 첫 열 61px). 행 이름이 좁은 열에 몇 줄씩 쌓여 읽기 어려워집니다.
@@ -345,23 +589,42 @@ th {
 table:has(th:nth-child(2)) tr > :first-child {
   min-width: 6rem;
 }
-/* 스크롤이 있다는 사실은 보여야 압니다. 안내는 표가 컨테이너보다 실제로 넓어지는 폭까지만
-   보여줍니다 — 704px 표는 768px 에서 간신히 들어가고(실측), 가장 넓은 표(지출 목록 12열, 1008px)는
-   본문 카드가 1080px 에서 막히므로 그 아래에서는 항상 밀립니다. 그래서 기본 780px,
-   가장 넓은 표에만 .wide 로 1080px 를 씁니다. */
+/* 스크롤이 있다는 사실은 보여야 압니다. 안내는 표가 컨테이너보다 실제로 넓어지는 폭까지만 보입니다.
+   표가 밀리는 마지막 폭은 「표의 최소 너비 + 표가 놓인 판의 좌우 여백」인데, 여백은 표가 본문에
+   바로 있는지 카드 안에 있는지, 그리고 화면 폭 자체(거터는 4vw) 에 따라 달라집니다. 그래서 열 수마다
+   2px 간격으로 밀림이 끝나는 폭을 재고(4열 486 · 6열 764 · 7열 806 · 8열 806 · 12열 1031px),
+   그보다 2~6px 넓은 폭까지 안내가 남게 임계값을 두었습니다(30.5 · 48 · 50.75 · 52 · 64.75em).
+   미디어 쿼리의 em 은 --tw-* 와 같은 루트 글자 크기를 세므로, 글자를 키워 표까지 넓어지면 임계폭도 함께 움직입니다.
+   열 수는 본문 표를 플러그인이 DOM 에서 세어 data-cols 로 심고(src/plugins/tableScroll.js), 도구 화면은 직접 적습니다.
+   8열 미리보기만 여유가 26px 입니다 — 이 표의 폭은 최소 너비 704px 에서 멈추지 않고 파일 내용 길이로도 커지므로,
+   안내가 표보다 먼저 사라지는 쪽보다 늦게 사라지는 쪽이 낫습니다. */
 .scroll-hint {
   display: none;
+  margin: -0.4rem 0 0.8rem;
 }
-@media (max-width: 780px) {
-  .scroll-hint {
+@media (max-width: 30.5em) {
+  .scroll-hint[data-cols="4"] {
     display: block;
-    margin: -0.4rem 0 0.8rem;
   }
 }
-@media (min-width: 781px) and (max-width: 1080px) {
-  .scroll-hint.wide {
+@media (max-width: 48em) {
+  .scroll-hint[data-cols="6"] {
     display: block;
-    margin: -0.4rem 0 0.8rem;
+  }
+}
+@media (max-width: 50.75em) {
+  .scroll-hint[data-cols="7"] {
+    display: block;
+  }
+}
+@media (max-width: 52em) {
+  .scroll-hint[data-cols="8"] {
+    display: block;
+  }
+}
+@media (max-width: 64.75em) {
+  .scroll-hint[data-cols="12"] {
+    display: block;
   }
 }
 
@@ -372,13 +635,14 @@ pre {
   max-width: 100%;
   padding: 0.8rem 1rem;
   border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--bg-soft);
-  font-size: 0.85rem;
+  border-radius: var(--r-ctl);
+  background: var(--inset);
+  font-size: var(--t-md);
   line-height: 1.6;
 }
 pre code {
   background: none;
+  border: 0;
   padding: 0;
   border-radius: 0;
   font-size: inherit;
@@ -386,54 +650,102 @@ pre code {
 
 /* ---------- 폼 · 버튼 ---------- */
 label {
-  font-size: 0.85rem;
+  font-size: var(--t-md);
   font-weight: 700;
   display: block;
-  margin-bottom: 0.25rem;
+  margin-bottom: var(--g-1);
+  color: var(--ink-2);
 }
 input,
 select,
 textarea {
   font: inherit;
+  font-size: var(--t-body);
   width: 100%;
-  padding: 0.5rem 0.65rem;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  background: var(--bg);
-  color: var(--ink);
+  padding: var(--ctl-pad-y) var(--ctl-pad-x);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-ctl);
+  background: var(--ctl-bg);
+  color: var(--ink-1);
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--ink-3);
+}
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  border-color: var(--accent);
 }
 input[type='date'],
 input[type='number'] {
   max-width: 100%;
+  font-variant-numeric: var(--num);
+}
+input[type='file'] {
+  /* 파일 선택은 폭이 넓어지면 기본 단추만 남고 나머지가 빈 칸이 됩니다(390px 실측). */
+  font-size: var(--t-md);
+  padding: 0.45rem 0.55rem;
 }
 .btn {
   font: inherit;
+  font-size: var(--t-md);
   font-weight: 700;
-  padding: 0.55rem 1rem;
-  border-radius: 10px;
-  border: 1px solid var(--brand);
-  background: var(--brand);
-  color: #fff;
+  padding: var(--btn-pad-y) var(--btn-pad-x);
+  border-radius: var(--r-ctl);
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
   cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 .btn:hover {
-  filter: brightness(1.06);
+  background: var(--accent-ink);
+  border-color: var(--accent-ink);
 }
+/* 위계가 두 단계입니다: 화면의 주 동작(채움)은 색면, 보조 동작은 테두리만.
+   지우기·비우기는 되돌릴 수 없는 동작이라 색으로 구분해 두었습니다. */
 .btn.ghost {
   background: transparent;
-  color: var(--brand);
+  border-color: var(--line-strong);
+  color: var(--ink-1);
+}
+.btn.ghost:hover {
+  background: color-mix(in srgb, var(--ink-1) 6%, transparent);
+  border-color: var(--ink-3);
+  color: var(--ink-1);
+}
+.btn.danger {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+  color: var(--danger);
+}
+.btn.danger:hover {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--on-accent);
 }
 .btn.small {
   padding: 0.32rem 0.65rem;
-  font-size: 0.85rem;
+  font-size: var(--t-sm);
 }
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
+/* 링크를 주 동작 버튼으로 쓰는 곳(첫 화면 CTA · 상업 안내)입니다. 버튼 색면에는 밑줄이 어울리지 않고
+   글자가 링크 정렬(왼쪽)로 남으므로 함께 맞춥니다. 버튼 요소 쪽 display 는 건드리지 않습니다. */
+a.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  text-decoration: none;
+}
 .row {
   display: flex;
-  gap: 0.6rem;
+  gap: var(--g-3);
   flex-wrap: wrap;
   align-items: end;
 }
@@ -443,22 +755,214 @@ input[type='number'] {
 .row > .shrink {
   flex: 0 0 auto;
 }
+/* 화면 템플릿에 흩어진 인라인 폭·여백을 이 둘로 흡수합니다.
+   값이 아니라 의도(넓은 칸 · 줄 감쌈 없음)를 이름으로 둡니다. */
+.row > .wide {
+  flex: 2 1 280px;
+}
+.row-top {
+  align-items: start;
+}
+
+/* ---------- 첫 화면 ---------- */
+/* 이 사이트는 마케팅 랜딩이 아니라 작업 도구라 적습니다. 다만 처음 들어온 사람이
+   「무엇을 하는 곳인가」를 한 화면에서 알아야 하므로, 개요 판만 위아래 여백을 넓게 씁니다.
+   위에서 --g-5(20px) 는 본문 공통 여백(main)이 이미 준 값이라, 여기서는 그 위 12px 만 보태
+   첫 화면 위 여백을 32px 로 맞춥니다(개편 전 padding-top 2.2rem 과 실측 차 ≤8px).
+   CTA 위 1.2rem → --g-5(1.25rem) 로 스케일에 올렸습니다. */
+.hero {
+  padding: var(--g-3) 0 var(--g-5);
+}
+.hero .lede {
+  font-size: var(--t-lede);
+}
+/* 세 개 나란히 놓는 진입 링크 판 — 좁은 화면에서는 .row 규칙대로 세로로 쌓입니다. */
+.hero .row {
+  max-width: 47.5rem; /* 760px */
+  margin-top: var(--g-5);
+}
+
+/* ---------- 안내 문서 화면 ---------- */
+/* 제목 아래 메타 줄(갱신일 · 대상 · 분류). 제목에 붙여 읽히도록 위 여백을 조금 되돌립니다. */
+.doc-meta {
+  margin-block-start: -0.4rem;
+}
+/* 분류 문서 맨 아래 도구로 건너가는 줄 — 카드 블록 뒤라 여백을 한 단계 넓게 씁니다. */
+.tool-links {
+  margin-block-start: var(--g-8);
+}
+/* 검색 입력은 전역 규칙으로 폭이 꽉 채워집니다. 손이 가는 칸이라 화면 끝까지 늘리지 않고 여기서 막습니다. */
+.search-box {
+  max-width: 26.25rem; /* 420px */
+}
+
+/* ---------- 도구 화면 ---------- */
+/* 카드 여백을 인라인 margin 대신 격자 간격으로 만듭니다. 카드 안 제목도 여기서 정리합니다. */
+.tool-stack {
+  display: grid;
+  gap: var(--g-4);
+  align-items: start;
+  /* 한 칸 격자라도auto(= 내용 최소 폭) 를 두면 12열 표의 최소 너비 58rem 이 카드 밖으로 밀려나옵니다
+     (390px 실측: 카드 자체가 968px 로 벌어져 화면이 좌우로 기었습니다). 칸을 0 에서 시작하게 하면
+     표는 제 래퍼 안에서만 밀리고, 카드는 화면 폭을 따라갑니다. */
+  grid-template-columns: minmax(0, 1fr);
+}
+/* 위·아래 여백을 격자 gap 이 전담하므로, 카드와 안내가 자기 바깥 여백을 더하지 않습니다.
+   (그렇지 않으면 gap + notice 마진이 겹쳐 첫 안내와 첫 카드 사이만 유독 넓어집니다.) */
+.tool-stack > * {
+  margin-block: 0;
+}
+.card h2 {
+  margin: 0 0 var(--g-3);
+  padding: 0;
+  border: 0;
+  font-size: var(--t-body);
+  line-height: var(--lh-tight);
+}
+/* 카드 안의 위쪽 여백은 아래 세 단계로만 계산합니다. 전에 템플릿에는 0 · .4 · .5 · .6 · .7 · .8 · .9 ·
+   1.1 · 1.2rem 이 뒤섞여 있어, 같은 카드 안에서 덩어리 사이 거리가 제각각이었습니다. */
+.card > * + * {
+  margin-top: var(--g-4);
+}
+.card > h2 + *,
+.card > h3 + * {
+  margin-top: 0;
+}
+.card p + p {
+  margin-top: var(--g-2);
+}
+.card .notice {
+  margin-block-end: 0;
+}
+/* 카드 안의 하위 덩어리(접힌 설정 · 수입 미리보기 · 보고서 액정) 는 카드보다 한 단계 촘촘한 격자로 세웁니다. */
+.sub-stack {
+  display: grid;
+  gap: var(--g-3);
+  /* 카드 안의 하위 덩어리도 같은 이유(표 최소 너비가 위로 새어나감)로 칸을 0 부터 시작시킵니다. */
+  grid-template-columns: minmax(0, 1fr);
+}
+.sub-stack > * {
+  margin-block: 0;
+}
+/* 안내 판의 목록은 머리 문장과 붙어 읽혀야 합니다(브라우저 기본 1em 을 줄입니다). */
+.notice ul {
+  margin: var(--g-2) 0 0;
+}
+/* 요약 판: 여섯 개를 3×2(좁으면 2×3)로 묶어, 한 화면에서 현황이 한눈에 들어오게 둡니다. */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--g-2);
+}
+.stats > div {
+  background: var(--inset);
+  border: 1px solid var(--line);
+  border-radius: var(--r-ctl);
+  padding: 0.7rem 0.85rem;
+}
+.stats dt {
+  font-size: var(--t-xs);
+  font-weight: 600;
+  color: var(--ink-3);
+}
+.stats dd {
+  margin: 0;
+  font-size: var(--t-xl);
+  font-weight: 800;
+  font-variant-numeric: var(--num);
+  letter-spacing: -0.01em;
+}
+@media (max-width: 680px) {
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+/* 비목·증빙·월별 집계 표 세 장. 각각 본문 폭을 다 쓰지 않고 나란히 서도 될 만큼 좁습니다. */
+.agg {
+  display: grid;
+  gap: var(--g-4);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@media (max-width: 900px) {
+  .agg {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.agg table {
+  margin: 0;
+}
+/* 입력·필터 격자. flex 로 두면 브라우저 기본 폭이 넓은 날짜·셀렉트가 제 각기 한 행을 차지합니다
+   (390px 실측: 필드 11개가 11행). 격자는 칸을 먼저 나누고 안의 입력은 0부터 늘어나게 합니다. */
+.fields {
+  display: grid;
+  gap: var(--g-3);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.fields.five {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.fields > .wide {
+  grid-column: span 2;
+}
+.fields > .act {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: var(--g-2);
+  justify-content: flex-end;
+  align-items: end;
+}
+@media (max-width: 900px) {
+  .fields,
+  .fields.five {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 680px) {
+  .fields,
+  .fields.five {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .fields > .wide {
+    grid-column: 1 / -1;
+  }
+}
 
 /* ---------- 체크리스트 ---------- */
 .stage {
-  margin: 1.6rem 0;
+  margin: var(--g-8) 0 var(--g-5);
+}
+/* 단계 제목은 단계 자체의 위 여백(2rem)이 이미 있으므로 다시 벌리지 않습니다. */
+.stage h2 {
+  margin-block-start: 0;
+}
+/* 진행률 카드 머리: 이름과 값을 한 줄 양 끝으로 벌립니다.
+   값과 막대는 카드 리듬(1rem)보다 붙어 있어야 한 세트로 읽힙니다 — 0.5rem. */
+.bar-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--g-3);
+  margin: 0;
+}
+.bar-head + .progress {
+  margin-top: var(--g-2);
+}
+.check-list {
+  list-style: none;
+  padding: 0;
+  margin: var(--g-3) 0 0;
 }
 .progress {
   height: 8px;
-  border-radius: 999px;
-  background: var(--bg-soft);
+  border-radius: var(--r-pill);
+  background: var(--inset-strong);
   border: 1px solid var(--line);
   overflow: hidden;
 }
 .progress > i {
   display: block;
   height: 100%;
-  background: var(--brand);
+  background: var(--accent);
   width: 0;
   transition: width 0.25s ease;
 }
@@ -477,7 +981,7 @@ input[type='number'] {
   margin-top: 0.35rem;
 }
 /* 손끝이 닿는 실제 대상은 이 라벨입니다. 체크박스만 20px 라 짚기 어려워,
-   항목 이름 줄 전체를 세로 42px 이상 눌리게 만듭니다(실측 42~69px). */
+   항목 이름 줄 전체를 세로 40px 이상 눌리게 만듭니다(390px 실측 40~67px · 항목 19개). */
 .check-item .label {
   display: block;
   padding-top: 0.45rem;
@@ -486,9 +990,16 @@ input[type='number'] {
      눌림 영역 아래쪽 5px 에서 체크가 토글되지 않습니다(390px 실측). */
   padding-bottom: 0.3rem;
   cursor: pointer;
+  font-weight: 600;
+  font-size: var(--t-body);
+}
+/* 항목 이름 아래 두 줄(이유 · 관련 안내 링크)은 행과 바짝 붙입니다. */
+.check-item .why,
+.check-item .go {
+  margin-block: var(--g-1) 0;
 }
 .check-item.done .label {
-  color: var(--ink-soft);
+  color: var(--ink-2);
   text-decoration: line-through;
 }
 
@@ -497,7 +1008,7 @@ input[type='number'] {
    손끝이 닿는 대상은 라벨 줄 전체이므로 flex 로 묶고 컨트롤 크기만 되돌립니다(세로 44px 확보). */
 #diagnose fieldset {
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--r-card);
   padding: 0.5rem 0.8rem 0.7rem;
   margin: 0 0 0.9rem;
 }
@@ -516,31 +1027,31 @@ input[type='number'] {
   flex: 0 0 auto;
   margin: 0;
   padding: 0;
-  accent-color: var(--brand);
+  accent-color: var(--accent);
 }
 
 /* ---------- 푸터 ---------- */
 .site-footer {
-  margin-top: 4rem;
+  margin-top: var(--g-10);
   border-top: 1px solid var(--line);
-  background: var(--bg-soft);
-  padding: 2rem 0 3rem;
-  font-size: 0.87rem;
-  color: var(--ink-soft);
+  background: var(--card);
+  padding: var(--g-8) 0 var(--g-10);
+  font-size: var(--t-md);
+  color: var(--ink-2);
 }
 .site-footer nav {
   display: flex;
-  gap: 1rem;
+  gap: var(--g-4);
   flex-wrap: wrap;
-  margin-bottom: 0.8rem;
+  margin-bottom: var(--g-3);
 }
 /* 푸터 분류 링크는 글자 높이만으로는 25px 라 손끝으로 누르기 어렵습니다(360px 실측).
-   세로 여백만 넓혀 누르는 영역을 35px 정도로 올리고, 글자 크기는 그대로 둡니다. */
+   세로 여백만 넓혀 누르는 영역을 올리고, 글자 크기는 그대로 둡니다 — 여백을 넓힌 뒤 35px(360·1440px 실측). */
 .site-footer nav a {
   padding-block: 0.35rem;
 }
 .site-footer a {
-  color: var(--ink-soft);
+  color: var(--ink-2);
 }
 
 /* ---------- 인쇄 ---------- */
@@ -561,23 +1072,36 @@ input[type='number'] {
     box-shadow: none;
     break-inside: avoid;
   }
+  /* 종이에서는 카드 안쪽 여백을 좁힙니다 — 화면용 1.2rem 은 종이의 좌우 2.5cm 와 겹쳐 넓고,
+     그 12.8px 때문에 열이 많은 표(12열) 가 종이 360px 가정에서 4px 밖으로 넘쳤습니다(실측). */
+  .card {
+    padding-inline: 0.8rem;
+  }
   /* 화면에서는 넓은 표를 좌우로 밀어 보지만, 인쇄에서는 미는 것이 없어 잘리면 안 됩니다.
      그래서 화면용으로 준 표 전체 최소 너비를 풀고 표를 페이지 폭에 맞춥니다(첫 열 하한은 남깁니다 — 아래).
      화면용 최소 너비 규칙은 우선순위가 높으니 !important 로 이깁니다. */
   .table-scroll {
     overflow: visible;
   }
-  /* 종이에 "밀어 보세요" 는 쓸모가 없습니다. 아래쪽이라 좁은 화면 규칙보다 나중에 이깁니다. */
+  /* 종이에 "밀어 보세요" 는 쓸모가 없습니다. 열 수마다 붙이는 .scroll-hint[data-cols="…"] 규칙이
+     우선순위가 더 높고 종이 폭(816px = 51em) 이 그중 좁은 화면 조건에 들어올 수 있어서 !important 로 끊습니다. */
   .scroll-hint {
-    display: none;
+    display: none !important;
   }
   .table-scroll > table {
     min-width: 0 !important;
     font-size: 9pt;
   }
+  /* 화면에서는 지출일·승인번호·금액이 한 줄에서 잘리면 의미가 어긋나므로 묶어 두지만,
+     종이가 420px 아래로 좁아지면 그 묶음이 표를 페이지 밖으로 밀어냅니다(개편 직후 실측: 표 446px vs 종이 420px).
+     인쇄에서는 감기게 둡니다 — 열이 좁아질 뿐 값 자체는 그대로 종이에 들어갑니다. */
+  .num,
+  .keep {
+    white-space: normal;
+  }
   /* 화면용 첫 열 하한(6rem) 은 인쇄에서도 그대로 둡니다 — 함께 풀면 자동 레이아웃이 행 이름 열을 46px 까지
      눌러 항목명이 두어 글자씩 세로로 쌓인 채 찍혔습니다(816px 인쇄 매체 실측).
-     표 전체의 최소 너비는 위에서 풀었으니 하한을 남겨도 종이를 넘치지 않습니다(항목 열 108px · 표 737px). */
+     표 전체의 최소 너비는 위에서 풀었으니 하한을 남겨도 종이를 넘치지 않습니다(816px 실측: 항목 열 108px · 표 752px). */
   /* 표 안 링크에는 주소를 붙이지 않습니다. 인쇄용 href 가 확인 열을 209px 로 늘려 다른 열을 굶게 했습니다(실측). */
   .table-scroll a::after {
     content: none;
@@ -589,7 +1113,7 @@ input[type='number'] {
        anywhere 는 잘라 먹을 수 있다는 뜻이라 최소 폭 계산에도 반영돼, 넘침이 먼저 사라집니다(360px 인쇄 실측). */
     overflow-wrap: anywhere;
   }
-  /* 알약 모양 배지는 화면에서는 한 줄로 묶지만, 종에서는 표 열의 최소 폭을 그 단어 길이가 결정해
+  /* 알약 모양 배지는 화면에서는 한 줄로 묶지만, 종이에서는 그 단어 길이가 열의 최소 폭을 결정해
      다른 열이 25px 로 짓눌립니다(360px 인쇄 실측: 시점 열 103px). 인쇄에서는 감싸게 둡니다. */
   .badge {
     white-space: normal;
@@ -598,6 +1122,39 @@ input[type='number'] {
     content: ' (' attr(href) ')';
     font-size: 0.8em;
     color: #444;
+  }
+}
+
+/* 다크 화면을 그대로 인쇄하면 짙은 면 위에 검은 글자가 얹힙니다(고치기 전 실측: 카드 `#1b1f27` 위에 `rgb(0, 0, 0)` · 대비 1.27:1,
+   안쪽 면 `#222731` 위 1.4:1, 경고 안내 `#2a2314` 위 1.35:1, 링크 `#7ab0ff` 는 흰 종이에서 2.21:1). 위의 인쇄 규칙은 `body` 만
+   흰색/검은색으로 되돌리고, 면·글자를 스스로 입히는 요소는 2층 값을 그대로 따라오기 때문입니다. 종이는 테마를 타지 않으므로
+   2층을 라이트 화면의 정의와 같은 값으로 되돌립니다 — 화면용 다크 블록과 같은 방식의 교체이고, 이 블록 뒤로는
+   라이트 인쇄와 다크 인쇄의 토큰 값·그리는 색이 완전히 같아집니다(816px 3화면 실측 · 종이 위 최저 대비 5.35:1). */
+@media print and (prefers-color-scheme: dark) {
+  :root {
+    --page: var(--p-gray-100);
+    --card: var(--p-white);
+    --inset: var(--p-gray-50);
+    --inset-strong: var(--p-gray-150);
+    --chip: var(--p-gray-200);
+
+    --ink-1: var(--p-gray-900);
+    --ink-2: var(--p-gray-600);
+    --ink-3: var(--p-gray-500);
+    --on-accent: var(--p-white);
+
+    --line: var(--p-line);
+    --line-strong: var(--p-line-strong);
+
+    --accent: var(--p-blue-600);
+    --accent-ink: var(--p-blue-700);
+    --accent-wash: var(--p-blue-50);
+    --ok: var(--p-green-700);
+    --ok-wash: var(--p-green-50);
+    --warn: var(--p-amber-700);
+    --warn-wash: var(--p-amber-50);
+    --danger: var(--p-red-700);
+    --danger-wash: var(--p-red-50);
   }
 }
 

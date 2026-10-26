@@ -24,7 +24,7 @@ const backupLimit = [
 ].join(' · ');
 ---
 
-<div id="receipt-tool" data-tool>
+<div id="receipt-tool" class="tool-stack" data-tool>
   <p class="notice info no-print">
     <strong>서버에 올라가지 않는 도구입니다</strong>
     입력한 내용은 이 브라우저의 저장소에만 들어갑니다. 계정을 만들거나 영수증 파일을 전송하지 않아도 됩니다.
@@ -32,10 +32,10 @@ const backupLimit = [
     여기서 고르는 항목은 정리용 분류일 뿐이며, 실제 인정 여부·서식 기준은 담당 주관기관 안내를 확인해야 합니다.
   </p>
 
-  <div class="card no-print" style="margin-bottom:1.2rem">
-    <h2 style="margin-top:0;font-size:1.05rem;border:0;padding:0">새 지출 추가</h2>
-    <p class="notice" data-load-note hidden style="margin-top:0"></p>
-    <div class="row" role="group" aria-label="지출 입력">
+  <div class="card no-print">
+    <h2>새 지출 추가</h2>
+    <p class="notice" data-load-note hidden></p>
+    <div class="fields" role="group" aria-label="지출 입력">
       <div>
         <label for="f-date">지출일</label>
         <input type="date" id="f-date" value={today} required />
@@ -81,31 +81,31 @@ const backupLimit = [
         <label for="f-submit">제출 상태</label>
         <select id="f-submit">{SUBMIT_STATES.map((s) => <option value={s}>{s}</option>)}</select>
       </div>
-      <div style="flex:2 1 220px">
+      <div class="wide">
         <label for="f-memo">메모</label>
         <input type="text" id="f-memo" placeholder="용도·요청받은 사람 한 줄" autocomplete="off" />
       </div>
-      <div class="shrink">
+      <div class="act">
         <button class="btn" type="button" data-add>추가</button>
       </div>
     </div>
-    <p class="small muted" data-form-msg style="margin:.6rem 0 0"></p>
+    <p class="small muted" data-form-msg role="status" aria-live="polite"></p>
   </div>
 
-  <div class="card no-print" style="margin-bottom:1.2rem" data-imp-card>
-    <h2 style="margin-top:0;font-size:1.05rem;border:0;padding:0">카드사 명세서 파일로 한 번에 넣기</h2>
-    <p class="small muted" style="margin-top:0">
+  <div class="card no-print" data-imp-card>
+    <h2>카드사 명세서 파일로 한 번에 넣기</h2>
+    <p class="small muted">
       카드사에서 받은 표 계산 파일(<code>.xlsx</code> · <code>.csv</code> · <code>.tsv</code>)을 고르거나 이 칸에 끌어다 놓으면,
       거래일·가맹점명·금액·승인번호를 읽어 아래 미리보기로 보여줍니다. 추가 단추를 누르기 전에는 목록에 아무것도 들어가지 않습니다.
       <strong>파일이 서버로 올라가지는 않습니다</strong> — 이 사이트는 정적 페이지라 보낼 저장소가 없고, 읽는 코드가 전부 이 페이지 안에 있습니다.
     </p>
-    <p class="small muted" style="margin-top:.4rem">
+    <p class="small muted">
       양식이 알려 주지 않은 것(어느 카드가 전용카드인지 · 협약 집행기간 · 가맹점별 비목)만 아래 <strong>세 칸</strong>에서 한 번 정해 주세요.
       그 답은 이 브라우저에 저장되어 다음 달 파일부터 자동으로 적용됩니다. 정해 두지 않은 칸은 값을 추측하지 않고
       <strong>확인 필요</strong>·빈 비목으로 남기고, 미리보기 아래「이것만 정해 주세요」에 모아 보여줍니다.
     </p>
     <div class="row" role="group" aria-label="명세서 파일">
-      <div style="flex:2 1 280px">
+      <div class="wide">
         <label for="imp-file">명세서 파일 ({importLimit})</label>
         <input type="file" id="imp-file" accept=".xlsx,.xls,.csv,.tsv,text/csv" />
       </div>
@@ -113,10 +113,10 @@ const backupLimit = [
     <p class="notice" data-imp-drop hidden>여기에 파일을 놓으면 읽습니다.</p>
     <p class="notice" data-imp-error hidden></p>
 
-    <details data-imp-settings style="margin:.8rem 0 0">
+    <details data-imp-settings class="sub-stack">
       <summary><strong>한 번만 정해 두는 설정</strong> <span class="muted small">(전용카드 끝번호 · 집행기간 · 가맹점→비목)</span></summary>
-      <div class="row" style="margin-top:.9rem" role="group" aria-label="수입 설정">
-        <div style="flex:2 1 220px">
+      <div class="fields" role="group" aria-label="수입 설정">
+        <div class="wide">
           <label for="imp-tails">전용(체크)카드 끝번호 (쉼표로 여러 개)</label>
           <input type="text" id="imp-tails" placeholder="예: 441, 902" autocomplete="off" />
         </div>
@@ -129,46 +129,44 @@ const backupLimit = [
           <input type="date" id="imp-to" />
         </div>
       </div>
-      <div class="row" style="margin-top:.6rem">
-        <div style="flex:2 1 280px">
-          <label for="imp-rules">가맹점 이름 조각 → 비목 (한 줄에 하나)</label>
-          <textarea id="imp-rules" rows="4" placeholder="예: 원단상사=재료비&#10;택배=운송비&#10;# 이 줄은 건너뜁니다"></textarea>
-        </div>
+      <div>
+        <label for="imp-rules">가맹점 이름 조각 → 비목 (한 줄에 하나)</label>
+        <textarea id="imp-rules" rows="4" placeholder="예: 원단상사=재료비&#10;택배=운송비&#10;# 이 줄은 건너뜁니다"></textarea>
       </div>
-      <div class="row" style="margin-top:.6rem;align-items:start">
+      <div class="row row-top">
         <div class="shrink"><button class="btn" type="button" data-imp-settings-save>설정을 이 브라우저에 저장</button></div>
-        <p class="small muted" data-imp-settings-note role="status" aria-live="polite" style="margin:.4rem 0 0"></p>
+        <p class="small muted" data-imp-settings-note role="status" aria-live="polite"></p>
       </div>
-      <p class="small muted" style="margin-top:.4rem">
+      <p class="small muted">
         끝번호를 비워 두면 결제경로를 <strong>확인 필요</strong>로 둡니다 — 명세서의 선불·후불 표기만으로는 개인카드인지 전용카드인지 알 수 없습니다.
         집행기간을 비워 두면 기간 판정도 <strong>확인 필요</strong>로 남습니다.
       </p>
     </details>
 
-    <div data-imp-preview hidden style="margin-top:1.1rem">
-      <p class="small" data-imp-summary style="margin:0 0 .5rem"></p>
-      <p class="small muted scroll-hint">열이 여덟 개입니다. 좁은 화면에서는 이 표를 좌우로 밀어 보세요.</p>
+    <div data-imp-preview hidden class="sub-stack">
+      <p class="small" data-imp-summary></p>
+      <p class="small muted scroll-hint" data-cols="8">열이 여덟 개입니다. 좁은 화면에서는 이 표를 좌우로 밀어 보세요.</p>
       <div class="table-scroll">
         <table>
           <caption class="small muted">미리보기 — 아래 「목록에 추가」를 눌러야 저장됩니다</caption>
           <thead>
             <tr>
-              <th scope="col">지출일</th><th scope="col">거래처</th><th scope="col">승인번호</th><th scope="col">금액</th>
+              <th scope="col" class="keep">지출일</th><th scope="col">거래처</th><th scope="col" class="keep">승인번호</th><th scope="col" class="num">금액</th>
               <th scope="col">비목</th><th scope="col">결제경로</th><th scope="col">집행 기간</th><th scope="col">메모</th>
             </tr>
           </thead>
           <tbody data-imp-rows></tbody>
         </table>
       </div>
-      <div class="notice info" style="margin:.7rem 0 0">
+      <div class="notice info">
         <strong>이것만 정해 주세요</strong>
-        <ul data-imp-gaps style="margin:.4rem 0 0"></ul>
+        <ul data-imp-gaps></ul>
       </div>
-      <div class="row" style="margin-top:.8rem">
+      <div class="row">
         <div class="shrink"><button class="btn" type="button" data-imp-commit>목록에 추가</button></div>
         <div class="shrink"><button class="btn ghost" type="button" data-imp-discard>미리보기 취소</button></div>
       </div>
-      <p class="small muted" style="margin-top:.6rem">
+      <p class="small muted">
         수취상태는 모두 <strong>미수취</strong>로 들어갑니다 — 카드사 명세서는 거래 내역을 알려주는 서류일 뿐 매출전표 원본이 아닙니다.
         전표 파일(PDF 등)을 받아「원본 확보」로 바꿔 두어야 정산 꾸러미에서 증빙 공백으로 잡히지 않습니다.
         같은 파일을 두 번 넣으면 이미 있는 행은 건너뛰고, 지난번에 지우신 행도 되살리지 않습니다(지운 기록이 그 id 를 기억합니다).
@@ -176,22 +174,22 @@ const backupLimit = [
     </div>
   </div>
 
-  <div class="card no-print" style="margin-bottom:1.2rem" data-report-card>
-    <h2 style="margin-top:0;font-size:1.05rem;border:0;padding:0">보고서 한 편으로 내보내기</h2>
-    <p class="small muted" style="margin-top:0">
+  <div class="card no-print" data-report-card>
+    <h2>보고서 한 편으로 내보내기</h2>
+    <p class="small muted">
       방금 넣은 행과 이 화면의 분류를 그대로 모아 <strong>정리 보고서</strong>로 만들어 파일로 내려줍니다
       (보고서 머리 · 1 집행 목록 · 2 비목별 합계 · 3 증빙 공백). 숫자는 화면 요약과 같은 계산 함수에서 나옵니다 — 파일 때문에 값이 달라지지 않습니다.
       기관에 보내기 전에 아래 값은 직접 확인해야 합니다(사이트가 대신 정하지 않습니다).
       <strong>「저장」을 누르지 않아도</strong> 아래 입력창에 지금 적힌 값이 그대로 보고서에 들어갑니다 — 저장은 다음에 이 화면을 열 때를 위해 남기는 일입니다.
     </p>
 
-    <div class="row" style="margin-top:.9rem" role="group" aria-label="보고서 정보">
+    <div class="fields" role="group" aria-label="보고서 정보">
       {
         REPORT_FIELDS.map((f) => {
           const id = fieldId(f.key);
           const wide = f.key === 'note' || f.key === 'projectName';
           return (
-            <div style={wide ? 'flex:2 1 280px' : undefined}>
+            <div class={wide ? 'wide' : undefined}>
               <label for={id}>
                 {f.label}
                 {f.required ? <span class="muted small"> (필수)</span> : <span class="muted small"> (선택)</span>}
@@ -216,21 +214,21 @@ const backupLimit = [
       }
     </div>
 
-    <div class="row" style="margin-top:.6rem;align-items:start">
+    <div class="row row-top">
       <div class="shrink"><button class="btn ghost" type="button" data-report-save>보고서 정보를 이 브라우저에 저장</button></div>
-      <p class="small muted" data-report-note role="status" aria-live="polite" style="margin:.4rem 0 0"></p>
+      <p class="small muted" data-report-note role="status" aria-live="polite"></p>
     </div>
 
     <p class="notice" data-report-gaps hidden>
       <strong>보고서에 넣을 값이 더 필요합니다</strong>
-      <ul data-report-gap-list style="margin:.4rem 0 0"></ul>
+      <ul data-report-gap-list></ul>
     </p>
 
-    <div class="row" style="margin-top:.7rem">
+    <div class="row">
       <div class="shrink"><button class="btn" type="button" data-export-report-html>보고서 HTML 내보내기</button></div>
       <div class="shrink"><button class="btn ghost" type="button" data-export-report-docx>보고서 DOCX 내보내기</button></div>
     </div>
-    <p class="small muted" style="margin-top:.5rem">
+    <p class="small muted">
       두 파일 모두 이 브라우저 안에서 조립되고, 담긴 값은 화면에 보이는 표와 같습니다. 내려받는 HTML 은 스크립트가 없는
       단일 파일입니다 — 열어 확인한 뒤 브라우저에서 <strong>인쇄 → PDF로 저장</strong> 하면 A4 보고서 PDF 가 됩니다.
       DOCX 는 OOXML(WordprocessingML) 규격을 지켜 이 사이트 코드가 손으로 조립한 파일이고, 글꼴은 맑은 고딕·Malgun Gothic 으로
@@ -241,9 +239,9 @@ const backupLimit = [
     </p>
   </div>
 
-  <div class="card" style="margin-bottom:1.2rem">
-    <h2 style="margin-top:0;font-size:1.05rem;border:0;padding:0">정리 현황</h2>
-    <div class="row no-print" role="group" aria-label="필터" style="margin-bottom:1rem">
+  <div class="card">
+    <h2>정리 현황</h2>
+    <div class="fields no-print" role="group" aria-label="필터">
       <div>
         <label for="q-from">시작일</label>
         <input type="date" id="q-from" />
@@ -294,57 +292,59 @@ const backupLimit = [
           {SUBMIT_STATES.map((s) => <option value={s}>{s}</option>)}
         </select>
       </div>
-      <div style="flex:2 1 200px">
+      <div class="wide">
         <label for="q-text">거래처·승인번호·비목·메모 검색</label>
         <input type="search" id="q-text" placeholder="예: 택배" />
       </div>
-      <div class="shrink">
+      <div class="act">
         <button class="btn ghost" type="button" data-reset-filters>필터 해제</button>
       </div>
     </div>
 
-    <dl data-summary style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.8rem;margin:0 0 1rem">
-      <div><dt class="small muted">총 집행액</dt><dd data-sum-total style="margin:0;font-size:1.3rem;font-weight:800">-</dd></div>
-      <div><dt class="small muted">입력 건수</dt><dd data-sum-count style="margin:0;font-size:1.3rem;font-weight:800">-</dd></div>
-      <div><dt class="small muted">전용카드로 결제</dt><dd data-sum-dedicated style="margin:0;font-size:1.3rem;font-weight:800">-</dd></div>
-      <div><dt class="small muted">수취구멍(미수취·재요청)</dt><dd data-sum-gap style="margin:0;font-size:1.3rem;font-weight:800">-</dd></div>
-      <div><dt class="small muted">기간 리스크(기간 외·확인 필요)</dt><dd data-sum-period style="margin:0;font-size:1.3rem;font-weight:800">-</dd></div>
-      <div><dt class="small muted">제출 전</dt><dd data-sum-unsent style="margin:0;font-size:1.3rem;font-weight:800">-</dd></div>
+    <dl class="stats" data-summary>
+      <div><dt>총 집행액</dt><dd data-sum-total>-</dd></div>
+      <div><dt>입력 건수</dt><dd data-sum-count>-</dd></div>
+      <div><dt>전용카드로 결제</dt><dd data-sum-dedicated>-</dd></div>
+      <div><dt>수취구멍(미수취·재요청)</dt><dd data-sum-gap>-</dd></div>
+      <div><dt>기간 리스크(기간 외·확인 필요)</dt><dd data-sum-period>-</dd></div>
+      <div><dt>제출 전</dt><dd data-sum-unsent>-</dd></div>
     </dl>
 
-    <div class="table-scroll">
-      <table>
-        <caption class="small muted" style="text-align:left;caption-side:top">비목(예산과목)별 합계</caption>
-        <thead><tr><th scope="col">비목</th><th scope="col">건수</th><th scope="col">금액</th></tr></thead>
-        <tbody data-by-budget><tr><td colspan="3" class="muted">자료가 없습니다</td></tr></tbody>
-      </table>
-    </div>
+    <div class="agg">
+      <div class="table-scroll">
+        <table>
+          <caption class="small muted">비목(예산과목)별 합계</caption>
+          <thead><tr><th scope="col">비목</th><th scope="col" class="num">건수</th><th scope="col" class="num">금액</th></tr></thead>
+          <tbody data-by-budget><tr><td colspan="3" class="muted">자료가 없습니다</td></tr></tbody>
+        </table>
+      </div>
 
-    <div class="table-scroll">
-      <table>
-        <caption class="small muted" style="text-align:left;caption-side:top">증빙 종류별 합계</caption>
-        <thead><tr><th scope="col">증빙 종류</th><th scope="col">건수</th><th scope="col">금액</th></tr></thead>
-        <tbody data-by-evidence><tr><td colspan="3" class="muted">자료가 없습니다</td></tr></tbody>
-      </table>
-    </div>
+      <div class="table-scroll">
+        <table>
+          <caption class="small muted">증빙 종류별 합계</caption>
+          <thead><tr><th scope="col">증빙 종류</th><th scope="col" class="num">건수</th><th scope="col" class="num">금액</th></tr></thead>
+          <tbody data-by-evidence><tr><td colspan="3" class="muted">자료가 없습니다</td></tr></tbody>
+        </table>
+      </div>
 
-    <div class="table-scroll">
-      <table>
-        <caption class="small muted" style="text-align:left;caption-side:top">월별 집행액</caption>
-        <thead><tr><th scope="col">월</th><th scope="col">건수</th><th scope="col">금액</th></tr></thead>
-        <tbody data-by-month><tr><td colspan="3" class="muted">자료가 없습니다</td></tr></tbody>
-      </table>
+      <div class="table-scroll">
+        <table>
+          <caption class="small muted">월별 집행액</caption>
+          <thead><tr><th scope="col">월</th><th scope="col" class="num">건수</th><th scope="col" class="num">금액</th></tr></thead>
+          <tbody data-by-month><tr><td colspan="3" class="muted">자료가 없습니다</td></tr></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
-  <div class="card no-print" style="margin-bottom:1.2rem" data-gap-card hidden>
-    <h2 style="margin-top:0;font-size:1.05rem;border:0;padding:0">재요청이 필요한 건 <span class="muted small">(수취 못 한 순서대로)</span></h2>
-    <p class="small muted scroll-hint no-print">열이 일곱 개입니다. 좁은 화면에서는 이 표를 좌우로 밀어 보세요.</p>
+  <div class="card no-print" data-gap-card hidden>
+    <h2>재요청이 필요한 건 <span class="muted small">(수취 못 한 순서대로)</span></h2>
+    <p class="small muted scroll-hint no-print" data-cols="7">열이 일곱 개입니다. 좁은 화면에서는 이 표를 좌우로 밀어 보세요.</p>
     <div class="table-scroll">
       <table>
         <thead>
           <tr>
-            <th scope="col">지출일</th><th scope="col">거래처</th><th scope="col">승인번호</th><th scope="col">금액</th>
+            <th scope="col" class="keep">지출일</th><th scope="col">거래처</th><th scope="col" class="keep">승인번호</th><th scope="col" class="num">금액</th>
             <th scope="col">비목</th><th scope="col">수취 상태</th><th scope="col">메모</th>
           </tr>
         </thead>
@@ -353,9 +353,9 @@ const backupLimit = [
     </div>
   </div>
 
-  <div class="card" style="margin-bottom:1.2rem">
-    <h2 style="margin-top:0;font-size:1.05rem;border:0;padding:0">입력 목록 <span class="muted small">(필터 적용된 결과)</span></h2>
-    <p class="small muted scroll-hint wide no-print">
+  <div class="card">
+    <h2>입력 목록 <span class="muted small">(필터 적용된 결과)</span></h2>
+    <p class="small muted scroll-hint no-print" data-cols="12">
       열이 열두 개(마지막은 지우기 버튼)입니다. 화면보다 표가 넓으면 좌우로 밀어 보세요.
       인쇄에는 지우기 열이 들어가지 않고, CSV 에는 이 표의 값에 전용카드 여부 열이 하나 더 들어갑니다.
       승인번호의 앞자리 0 은 CSV 에서 엑셀이 숫자로 바꿔 지울 수 있으니, 그대로 남아야 하는 자료는 JSON 백업을 쓰세요.
@@ -364,7 +364,7 @@ const backupLimit = [
       <table>
         <thead>
           <tr>
-            <th scope="col">지출일</th><th scope="col">거래처</th><th scope="col">승인번호</th><th scope="col">금액</th>
+            <th scope="col" class="keep">지출일</th><th scope="col">거래처</th><th scope="col" class="keep">승인번호</th><th scope="col" class="num">금액</th>
             <th scope="col">비목</th><th scope="col">결제경로</th><th scope="col">집행 기간</th>
             <th scope="col">증빙 종류</th><th scope="col">수취</th><th scope="col">제출</th>
             <th scope="col">메모</th><th scope="col" class="no-print"><span aria-hidden="true">지우기</span></th>
@@ -372,13 +372,13 @@ const backupLimit = [
         </thead>
         <tbody data-rows><tr><td colspan="12" class="muted">아직 입력이 없습니다.</td></tr></tbody>
         <tfoot data-foot hidden>
-          <tr><th scope="row">합계</th><td></td><td></td><td data-foot-amount></td><td colspan="8"></td></tr>
+          <tr><th scope="row">합계</th><td></td><td></td><td class="num" data-foot-amount></td><td colspan="8"></td></tr>
         </tfoot>
       </table>
     </div>
   </div>
 
-  <div class="row no-print" style="align-items:start">
+  <div class="row no-print">
     <div class="shrink"><button class="btn" type="button" data-export-csv>CSV 내보내기</button></div>
     <div class="shrink"><button class="btn" type="button" data-export-bundle>정산 꾸러미 내보내기</button></div>
     <div class="shrink"><button class="btn ghost" type="button" data-export-json>JSON 백업</button></div>
@@ -386,23 +386,24 @@ const backupLimit = [
       <label for="import-file">JSON 복원</label>
       <input type="file" id="import-file" accept="application/json,.json" />
     </div>
-    <div class="shrink"><button class="btn ghost" type="button" data-clear>지출 목록 비우기</button></div>
+    <div class="shrink"><button class="btn danger" type="button" data-clear>지출 목록 비우기</button></div>
   </div>
-  <p class="small muted no-print" style="margin-top:.4rem">
-    <strong>정산 꾸러미</strong>는 지금 화면에 보이는 결과를 한 편으로 묶습니다 — 요약 · 증빙 공백 · 기간 리스크 · 제출 전 항목 · 비목/결제경로/월별 합계 · 체크리스트 남은 것, 그리고
-    담당 기관에 보낼 <strong>증빙 요청 메일 초안</strong>(기관명·사업명은 〔 〕 으로 비워 둡니다 — 제가 알 수 없는 값이라). 텍스트 파일 하나로 내려받아 메모장·메일·인쇄 어디에서든 씁니다.
-  </p>
-  <p class="small muted no-print" style="margin-top:.4rem">
-    <strong>지출 목록 비우기</strong>는 이 브라우저에 저장된 지출 항목만 삭제합니다. 체크리스트 확인 결과는 그대로 남습니다.
-  </p>
-  <p class="small muted no-print" style="margin-top:.4rem">
-    <strong>JSON 복원</strong>은 이 도구가 내보낸 백업 파일만 읽습니다. 한 번에 받는 범위는 {backupLimit} 까지이고, 넘으면 복원하지 않고 사유를 알려줍니다 — 복원 시도 하나가 이 탭을 죽이지 못하게 하기 때문입니다.
-  </p>
-
-  <p class="small muted no-print" style="margin-top:.4rem">
-    <strong>JSON 백업</strong>에는 지출 목록 · 체크리스트 확인 결과 · 위 명세서 수입 설정(전용카드 끝번호 · 집행기간 · 가맹점→비목 규칙)이 함께 들어갑니다.
-    다른 브라우저에서 복원하면 지난 달에 정해 둔 수입 규칙까지 그대로 적용됩니다.
-  </p>
+  <div class="sub-stack no-print">
+    <p class="small muted">
+      <strong>정산 꾸러미</strong>는 지금 화면에 보이는 결과를 한 편으로 묶습니다 — 요약 · 증빙 공백 · 기간 리스크 · 제출 전 항목 · 비목/결제경로/월별 합계 · 체크리스트 남은 것, 그리고
+      담당 기관에 보낼 <strong>증빙 요청 메일 초안</strong>(기관명·사업명은 〔 〕 으로 비워 둡니다 — 제가 알 수 없는 값이라). 텍스트 파일 하나로 내려받아 메모장·메일·인쇄 어디에서든 씁니다.
+    </p>
+    <p class="small muted">
+      <strong>지출 목록 비우기</strong>는 이 브라우저에 저장된 지출 항목만 삭제합니다. 체크리스트 확인 결과는 그대로 남습니다.
+    </p>
+    <p class="small muted">
+      <strong>JSON 복원</strong>은 이 도구가 내보낸 백업 파일만 읽습니다. 한 번에 받는 범위는 {backupLimit} 까지이고, 넘으면 복원하지 않고 사유를 알려줍니다 — 복원 시도 하나가 이 탭을 죽이지 못하게 하기 때문입니다.
+    </p>
+    <p class="small muted">
+      <strong>JSON 백업</strong>에는 지출 목록 · 체크리스트 확인 결과 · 위 명세서 수입 설정(전용카드 끝번호 · 집행기간 · 가맹점→비목 규칙)이 함께 들어갑니다.
+      다른 브라우저에서 복원하면 지난 달에 정해 둔 수입 규칙까지 그대로 적용됩니다.
+    </p>
+  </div>
 
   <p class="notice" data-storage-warning hidden>
     <strong>브라우저 저장에 실패했습니다</strong>
@@ -550,10 +551,12 @@ const backupLimit = [
       deliver(name, new Blob([bytes.slice().buffer as ArrayBuffer], { type }));
     }
 
-    function cell(text: string, bold = false): HTMLElement {
+    /** 셀 하나. 두 번째 인자는 화면 클래스만 받는 자리입니다(값 계산과 무관).
+     *  `.num` = 금액(우측·tabular-nums) · `.keep` = 한 줄로 있어야 하는 문자열(지출일·승인번호). */
+    function cell(text: string, cls = ''): HTMLElement {
       const td = document.createElement('td');
       td.textContent = text;
-      if (bold) td.style.fontWeight = '700';
+      if (cls) td.className = cls;
       return td;
     }
 
@@ -625,8 +628,8 @@ const backupLimit = [
           th.scope = 'row';
           th.textContent = g.key;
           tr.appendChild(th);
-          tr.appendChild(cell(`${g.count}건`));
-          tr.appendChild(cell(formatKRW(g.total), true));
+          tr.appendChild(cell(`${g.count}건`, 'num'));
+          tr.appendChild(cell(formatKRW(g.total), 'num strong'));
           tbody.appendChild(tr);
         }
       };
@@ -639,10 +642,10 @@ const backupLimit = [
         gapBody.textContent = '';
         for (const e of gaps.slice(0, 30)) {
           const tr = document.createElement('tr');
-          tr.appendChild(cell(e.date));
+          tr.appendChild(cell(e.date, 'keep'));
           tr.appendChild(cell(e.vendor || '-'));
-          tr.appendChild(cell(e.approvalNo || '-'));
-          tr.appendChild(cell(formatKRW(e.amount), true));
+          tr.appendChild(cell(e.approvalNo || '-', 'keep'));
+          tr.appendChild(cell(formatKRW(e.amount), 'num strong'));
           tr.appendChild(cell(e.budgetItem));
           tr.appendChild(cell(e.evidenceState));
           tr.appendChild(cell(e.memo || '-'));
@@ -657,10 +660,10 @@ const backupLimit = [
         }
         for (const e of list) {
           const tr = document.createElement('tr');
-          tr.appendChild(cell(e.date));
+          tr.appendChild(cell(e.date, 'keep'));
           tr.appendChild(cell(e.vendor || '-'));
-          tr.appendChild(cell(e.approvalNo || '-'));
-          tr.appendChild(cell(formatKRW(e.amount)));
+          tr.appendChild(cell(e.approvalNo || '-', 'keep'));
+          tr.appendChild(cell(formatKRW(e.amount), 'num'));
           tr.appendChild(cell(e.budgetItem));
           tr.appendChild(cell(e.payMethod));
           tr.appendChild(cell(e.periodState));
@@ -674,7 +677,7 @@ const backupLimit = [
           td.className = 'no-print';
           const btn = document.createElement('button');
           btn.type = 'button';
-          btn.className = 'btn ghost small no-print';
+          btn.className = 'btn danger small no-print';
           btn.textContent = '지우기';
           btn.dataset.id = e.id;
           btn.addEventListener('click', () => remove(e.id));
@@ -1178,7 +1181,7 @@ const backupLimit = [
       impError.textContent = '';
       for (const line of lines) {
         const span = document.createElement('span');
-        span.style.display = 'block';
+        span.className = 'line';
         span.textContent = line;
         impError.appendChild(span);
       }
@@ -1227,17 +1230,17 @@ const backupLimit = [
       impRows.textContent = '';
       for (const e of fresh.slice(0, PREVIEW_ROWS)) {
         const tr = document.createElement('tr');
-        for (const text of [
-          e.date,
-          e.vendor || '(거래처 없음)',
-          e.approvalNo || '—',
-          formatKRW(e.amount),
-          e.budgetItem || '(비목 미정)',
-          e.payMethod,
-          e.periodState,
-          e.memo
-        ])
-          tr.appendChild(cell(text));
+        for (const [text, cls] of [
+          [e.date, 'keep'],
+          [e.vendor || '(거래처 없음)', ''],
+          [e.approvalNo || '—', 'keep'],
+          [formatKRW(e.amount), 'num'],
+          [e.budgetItem || '(비목 미정)', ''],
+          [e.payMethod, ''],
+          [e.periodState, ''],
+          [e.memo, '']
+        ] as [string, string][])
+          tr.appendChild(cell(text, cls));
         impRows.appendChild(tr);
       }
       if (fresh.length > PREVIEW_ROWS) {

@@ -31,7 +31,7 @@ const fmt = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'long' }).format(d.upd
   <article class="measure">
     <p class="small"><a href={p('/guide/')}>안내</a> › <a href={p(`/guide/${d.category}/`)}>{categoryTitle(d.category)}</a></p>
     <h1>{d.title}</h1>
-    <p class="muted small" style="margin-top:-0.4rem">
+    <p class="muted small doc-meta">
       갱신 {fmt} · 대상 {d.audience.map((a) => AUDIENCE_LABEL[a] ?? a).join(', ')} · {categoryTitle(d.category)}
     </p>
 

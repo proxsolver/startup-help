@@ -40,7 +40,11 @@ const canonical = absoluteUrl(Astro.site, path || Astro.url.pathname);
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{docTitle}</title>
     <meta name="description" content={description} />
-    <meta name="theme-color" content="#1d5fd0" />
+    {/* 브라우저 창 색은 붙박이 헤더 면과 같게 맞춥니다 — 브랜드 파랑으로 칠했을 때는 헤더가 옅은 회색인데
+        창 맨 위만 짙은 파랑으로 떠서 어색했습니다. 값은 global.css 1층 원시값(--p-gray-100 · --p-dark-page)의 사본이니
+        그 토큰을 바꾸면 여기 두 줄도 함께 고치세요. */}
+    <meta name="theme-color" content="#f5f6f8" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#14171c" />
     <meta name="color-scheme" content="light dark" />
     {canonical && <link rel="canonical" href={canonical} />}
     <meta property="og:type" content="website" />

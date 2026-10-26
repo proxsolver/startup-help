@@ -12,15 +12,15 @@ const totalItems = stages.reduce((n, s) => n + s.items.length, 0);
 ---
 
 <div id="checklist" data-checklist>
-  <div class="card" style="margin-bottom:1.4rem">
-    <p style="display:flex;justify-content:space-between;margin:0 0 .5rem">
+  <div class="card">
+    <p class="bar-head">
       <strong>전체 진행률</strong>
       <span class="muted small" data-overall-text>0 / {totalItems}</span>
     </p>
     <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-overall-bar>
       <i data-overall-fill></i>
     </div>
-    <p class="small muted" style="margin:.6rem 0 0">
+    <p class="small muted">
       체크 상태는 서버로 전송되지 않고 이 브라우저에만 저장됩니다. 기기를 바꾸면 저장한 목록이 함께 옮기지 않는 한 사라집니다.
     </p>
   </div>
@@ -28,7 +28,7 @@ const totalItems = stages.reduce((n, s) => n + s.items.length, 0);
   {
     stages.map((stage) => (
       <section class="stage" data-stage={stage.id}>
-        <h2 style="margin-top:0">
+        <h2>
           {stage.title}
           <span class="badge" data-stage-count>{stage.items.length}개</span>
         </h2>
@@ -36,7 +36,7 @@ const totalItems = stages.reduce((n, s) => n + s.items.length, 0);
         <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-stage-bar>
           <i data-stage-fill></i>
         </div>
-        <ul style="list-style:none;padding:0;margin:.8rem 0 0">
+        <ul class="check-list">
           {stage.items.map((item) => (
             <li class="check-item" data-item>
               <input
@@ -45,11 +45,11 @@ const totalItems = stages.reduce((n, s) => n + s.items.length, 0);
                 data-id={item.id}
               />
               <div>
-                <label class="label" for={`c-${item.id}`} style="font-weight:600;font-size:1rem">
+                <label class="label" for={`c-${item.id}`}>
                   {item.label}
                 </label>
-                {item.why && <p class="small muted" style="margin:.15rem 0">{item.why}</p>}
-                <p class="small" style="margin:.2rem 0 0">
+                {item.why && <p class="small muted why">{item.why}</p>}
+                <p class="small go">
                   {item.guide && <a href={p(item.guide)}>관련 안내</a>}
                   {item.guide && item.link && <span class="muted"> · </span>}
                   {item.link && (
