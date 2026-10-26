@@ -20,7 +20,7 @@ jobs:
     steps:
       # 배포 도구는 부동 태그(@v5) 대신 커밋 해시로 고정합니다. 태그는 누가 언제 다시 붙이는지 모르므로,
       # 같은 워크플로가 다른 코드를 실행하는 사고(공급망)를 여기서 막습니다. 갱신은 dependabot 이 제안합니다.
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
