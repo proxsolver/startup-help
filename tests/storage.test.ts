@@ -255,7 +255,8 @@ describe('백업 파일 형식', () => {
   });
 
   it('백업 파일명에 날짜가 들어간다', () => {
-    expect(backupFileName(new Date('2026-03-31T12:00:00Z'))).toBe('startup-help-backup_20260331.json');
+    // 로컬 구성자 — 파일 이름의 날짜는 사용자 달력 기준이므로 시간대와 무관해야 합니다.
+    expect(backupFileName(new Date(2026, 2, 31, 12, 0, 0))).toBe('startup-help-backup_20260331.json');
   });
 });
 

@@ -11,7 +11,7 @@
  * 값은 제가 알 수 없으므로 〔대괄호〕 자리표시자로 남깁니다. 보내기 전에 채워야 한다는 사실을
  * 파일 맨 아래에 한 줄로 적어 두었습니다.
  */
-import { computeTotals, evidenceGapList, formatKRW, currentPeriod } from './receipts';
+import { computeTotals, dayStamp, evidenceGapList, formatKRW, currentPeriod } from './receipts';
 import type { ReceiptEntry, Group, Totals } from './receipts';
 
 export interface BundleInput {
@@ -219,6 +219,6 @@ export function bundleFileName(period: string, now: Date = new Date()): string {
     .replace(/[^0-9A-Za-z_~-]/g, '_')
     .replace(/_+/g, '_')
     .replace(/^_|_$/g, '');
-  const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+  const stamp = dayStamp(now);
   return `kkureomi_${safe || 'all'}_${stamp}.txt`;
 }

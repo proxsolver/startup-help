@@ -10,7 +10,7 @@
  * - **비공식 표기를 맨 위와 맨 아래에**: 사이트의 다른 산출물(꾸러미·CSV)과 같은 고지입니다.
  * - **스크립트 없는 HTML**: 내려받은 파일에 `<script>` 를 넣지 않습니다. 파일을 어디서 열어도 동작은 텍스트와 인쇄뿐입니다.
  */
-import { computeTotals, currentPeriod, evidenceGapList, formatKRW } from './receipts';
+import { computeTotals, currentPeriod, dayStamp, evidenceGapList, formatKRW } from './receipts';
 import type { ReceiptEntry } from './receipts';
 
 /**
@@ -360,6 +360,6 @@ export function reportFileName(period: string, now: Date = new Date()): string {
     .replace(/_{2,}/g, '_')
     .replace(/^[_.-]+|[_.-]+$/g, '')
     .slice(0, 40);
-  const dateStamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
+  const dateStamp = dayStamp(now);
   return `report_${safe || 'all'}_${dateStamp}`;
 }

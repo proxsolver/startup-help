@@ -404,8 +404,20 @@ export function exportPeriod(f: Filters = {}, now: Date = new Date()): string {
   return currentPeriod(now);
 }
 
+/**
+ * 파일 이름에 붙이는 날짜(YYYYMMDD)의 단일 출처입니다. **사용자 컴퓨터의 달력 날짜**를 씁니다.
+ * `toISOString()` 은 UTC 라서 한국(KST)에서 0 시에서 9 시 사이에 내리면 파일이 어제 날짜를 갖습니다.
+ * 같은 화면에서 네 개를 내려받을 때 CSV·JSON 은 어제, 꾸러미·보고서는 오늘이 되면 받은 사람이
+ * "언제 정리한 묶음인지" 를 못 맞힙니다. 문서 본문에 적는 작성 시각(`report.ts` 의 `stamp`)도
+ * 로컬 기준이라, 파일 이름은 그쪽으로 맞춥니다.
+ */
+export function dayStamp(now: Date = new Date()): string {
+  const two = (n: number) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}${two(now.getMonth() + 1)}${two(now.getDate())}`;
+}
+
 export function csvFileName(period: string, now: Date = new Date()): string {
-  const stamp = now.toISOString().slice(0, 10).replace(/-/g, '');
+  const stamp = dayStamp(now);
   // 파일 이름을 망가뜨릴 수 있는 문자(경로 구분자·점·한글 등)는 모두 지운 뒤 비어 있으면 all 로 갑니다.
   const safe = (period || 'all')
     .replace(/[^0-9A-Za-z_~]/g, '_')

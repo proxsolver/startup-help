@@ -11,7 +11,7 @@
  * - 백업 복원은 크기·건수 상한을 두고 넘으면 아예 읽지 않습니다 → 복원 시도 한 번으로 탭을 죽일 수 없습니다.
  * - 지울 수 없는 행이 있으면 개수를 그대로 드러냅니다 → 조용히 사라지는 데이터 없음.
  */
-import { SCHEMA_VERSION, sanitizeEntries, type ReceiptEntry } from './receipts';
+import { SCHEMA_VERSION, dayStamp, sanitizeEntries, type ReceiptEntry } from './receipts';
 import { emptyCardSettings, normalizeCardSettings, type CardSettings } from './cardimport';
 import { emptyReportMeta, normalizeReportMeta, REPORT_FIELDS, type ReportMeta } from './report';
 
@@ -345,9 +345,9 @@ export function getStorage(): Storage | undefined {
   }
 }
 
-/** 백업/복원용 JSON 파일 이름 */
+/** 백업/복원용 JSON 파일 이름 — 날짜는 다른 내보내기와 같은 기준(사용자 달력)입니다. */
 export function backupFileName(date: Date = new Date()): string {
-  return `startup-help-backup_${date.toISOString().slice(0, 10).replace(/-/g, '')}.json`;
+  return `startup-help-backup_${dayStamp(date)}.json`;
 }
 
 export function serializeState(state: AppState): string {

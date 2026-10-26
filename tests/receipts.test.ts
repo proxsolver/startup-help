@@ -5,6 +5,7 @@ import {
   CSV_HEADER,
   computeTotals,
   csvFileName,
+  dayStamp,
   evidenceGapList,
   exportPeriod,
   filterEntries,
@@ -17,6 +18,9 @@ import {
   toCsvFile,
   type ReceiptEntry
 } from '../src/lib/receipts';
+import { bundleFileName } from '../src/lib/bundle';
+import { reportFileName } from '../src/lib/report';
+import { backupFileName } from '../src/lib/storage';
 
 function entry(over: Partial<ReceiptEntry> = {}): ReceiptEntry {
   return {
@@ -406,13 +410,34 @@ describe('표기 헬퍼', () => {
   });
 
   it('csvFileName 은 기간 문자를 파일 이름에 안전한 형태로 바꾼다', () => {
-    const now = new Date('2026-03-31T12:00:00Z');
+    // 로컬 구성자로 만듭니다(시간대와 무관하게 3 월 31 일) — 파일 이름의 날짜는 로컬 달력 기준입니다.
+    const now = new Date(2026, 2, 31, 12, 0, 0);
     expect(csvFileName('2026-01-01~2026-01-31', now)).toBe('execution_20260101~20260131_20260331.csv');
     expect(csvFileName('from-2026-02-05', now)).toBe('execution_from20260205_20260331.csv');
     // 경로 구분자·점·한글은 파일 이름을 망가뜨리지 못합니다.
     expect(csvFileName('../../암/기', now)).toBe('execution_all_20260331.csv');
     expect(csvFileName('  ', now)).toBe('execution_all_20260331.csv');
     expect(csvFileName('../x', now)).toBe('execution_x_20260331.csv');
+  });
+});
+
+describe('내보내기 파일 이름의 날짜 기준 (네 산출물이 같은 날)', () => {
+  // 새벽에 내려받는 일이 많습니다. 한국에서 0 시~9 시는 UTC 에서 하루 전이라, UTC 기준을 섞으면
+  // 한 화면에서 받은 네 파일 중 둘은 어제, 둘은 오늘 날짜가 붙어 "같은 묶음"이라는 증거가 사라집니다.
+  const NOW = new Date(2026, 9, 27, 1, 35, 0);
+
+  const stampOf = (name: string) => (name.match(/(20\d{6})/) ?? [])[1];
+
+  it('CSV · 꾸러미 · 보고서 · JSON 백업이 같은 날짜리를 파일 이름에 갖는다', () => {
+    expect(stampOf(csvFileName('2026-09', NOW))).toBe('20261027');
+    expect(stampOf(bundleFileName('2026-09', NOW))).toBe('20261027');
+    expect(stampOf(reportFileName('2026-09', NOW))).toBe('20261027');
+    expect(stampOf(backupFileName(NOW))).toBe('20261027');
+  });
+
+  it('dayStamp 는 로컬 달력을 쓴다', () => {
+    expect(dayStamp(NOW)).toBe('20261027');
+    expect(dayStamp(new Date(2026, 0, 5))).toBe('20260105');
   });
 });
 
