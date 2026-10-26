@@ -228,8 +228,11 @@ npm run check:dist     # 배포물 검사: 내부 링크 612건·화면 27개 (b
 - 콘텐츠 게이트는 **출처 주소의 형식**만 봅니다. 카드사 페이지에 적힌 번호·경로의 진실성은 CI 가 검증하지 못하므로
   사람이 원문을 열어 확인한 시점을 문서에 적어 둡니다.
 
-**남은 보안 작업(미착수)**: Actions 4개를 커밋 SHA 로 고정(`@v5`·`@v4` 태그는 바뀔 수 있음), Dependabot alerts·CodeQL·`SECURITY.md` 추가,
-Settings 에서 push protection 켜기.
+**보안 파이프라인 (2026-10-27 반영)**: 배포 워크플로의 Actions 네 개를 부동 태그 대신 커밋 해시로 고정했습니다 —
+`actions/checkout` `fbc6f39…`(v5.1.0) · `actions/setup-node` `a0853c2…`(v5.0.0) · `actions/upload-pages-artifact` `7b1f4a7…`(v4.0.0) ·
+`actions/deploy-pages` `d6db901…`(v4.0.5). 고정 시점에 부동 태그가 가리키던 commit 과 같은 대상이라 오늘 배포 동작은 바뀌지 않습니다.
+`.github/dependabot.yml` 로 매주 금요일 03:00(아시아/서울) 에 `npm`·Actions 갱신 제안이 오게 했고, `SECURITY.md` 에 위험면·신고 경로·알리고 남기는 한계를 적었습니다.
+남은 것: CodeQL 도입 판단(정적 사이트라 이득이 작아 보류), 저장소 Settings 의 사람 항목 두 개 — 비공개 취약점 신고(2026-10-27 API 확인: 꺼져 있음)·push protection.
 
 ## 배포
 
@@ -605,7 +608,7 @@ frontmatter 만 보면 글 속의 블로그·기사 링크가 무방비로 통�
 - 개인정보 처리방침의 법적 의무 범위 확인 (현재는 운영 사실 서술만)
 - OCR·사진 인식 (서버 수신 없이 구현 가능한지 먼저 검토)
 - 접근성·E2E 자동 테스트 (현재: 단위 테스트 259 + 콘텐츠 게이트 + 빌드 검사)
-- **배포 파이프라인 잠금** — Actions SHA 고정, Dependabot·CodeQL·`SECURITY.md` (위 '보안 관점' 참조, 미착수)
+- 배포 파이프라인 잠금은 2026-10-27 에 끝냈습니다(Actions 네 개 해시 고정 · dependabot · `SECURITY.md`) — 위 '보안 관점' 참조. 남아 있는 것은 CodeQL 도입 판단과, 저장소 Settings 에서 사람이 켜는 두 개(비공개 취약점 신고·push protection) 입니다.
 - 콘텐츠 증량 (현재 10건)
 
 ## 라이선스·면책

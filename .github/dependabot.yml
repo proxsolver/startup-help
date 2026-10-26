@@ -1,0 +1,31 @@
+# CI 의존성 갱신 제안. 브레이킹 업그레이드는 자동으로 합치지 않고 Pull Request 로 열어 사람이 판정합니다.
+# 동작: 매주 금요일 03:00(아시아/서울)에 npm 과 github-actions 을 각각 확인합니다.
+# `.github/workflows/deploy.yml` 의 Actions 는 부동 태그가 아니라 커밋 해시로 고정해 두었으므로,
+# 갱신 제안은 버전 이름과 해시를 함께 고치는 형태로 옵니다.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: friday
+      time: '03:00'
+      timezone: Asia/Seoul
+    open-pull-requests-limit: 5
+    groups:
+      # 실행 환경과 테스트 도구를 한 번에 올린다(별도로 올리면 게이트가 서로 다른 세대에 붙는다).
+      build-and-test:
+        patterns:
+          - '*'
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: friday
+      time: '03:00'
+      timezone: Asia/Seoul
+    open-pull-requests-limit: 5
