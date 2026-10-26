@@ -38,12 +38,16 @@ const backupLimit = [
       <strong>보고서 한 편</strong>은 이 화면의 행과 분류를 그대로 묶은 문서 파일입니다
       (보고서 머리 · 1 집행 목록 · 2 비목별 합계 · 3 증빙 공백) — 기관 공식 서식을 대체하지 않습니다.
     </p>
-    <h3 id="exp-report">보고서 한 편</h3>
+    <h3 id="exp-report">보고서 한 편 · 제출 전에 확인</h3>
     <div class="row" role="group" aria-labelledby="exp-report">
       <div class="shrink"><button class="btn" type="button" data-export-report-html>보고서 HTML 내보내기</button></div>
       <div class="shrink"><button class="btn ghost" type="button" data-export-report-docx>보고서 DOCX 내보내기</button></div>
     </div>
-    <h3 id="exp-backup">데이터 백업</h3>
+    <h3 id="exp-backup">데이터 백업 · 정리 기록</h3>
+    <p class="small muted">
+      이 세 단추는 화면의 정리 내용을 파일로 남기는 일입니다 — 기관에 내는 제출용 문서는 위의
+      <strong>보고서 한 편</strong>입니다.
+    </p>
     <div class="row" role="group" aria-labelledby="exp-backup">
       <div class="shrink"><button class="btn" type="button" data-export-csv>CSV 내보내기</button></div>
       <div class="shrink"><button class="btn" type="button" data-export-bundle>정산 꾸러미 내보내기</button></div>
@@ -194,12 +198,12 @@ const backupLimit = [
   </div>
 
   <div class="card no-print" data-report-card>
-    <h2>보고서 머리에 넣을 값</h2>
+    <h2>보고서 한 편에 넣을 값</h2>
     <p class="small muted">
-      이 값은 보고서 머리(사업명 · 신청인·대표자 · 주관 기관 · 정산 기간 · 연락처 · 특이사항)에만 들어갑니다.
+      위 <strong>보고서 한 편</strong>의 머리(사업명 · 신청인·대표자 · 주관 기관 · 정산 기간 · 연락처 · 특이사항)에 들어가는 값입니다.
       숫자는 화면 요약과 같은 계산 함수에서 나옵니다 — 파일 때문에 값이 달라지지 않습니다.
       <strong>「저장」을 누르지 않아도</strong> 아래 입력창에 지금 적힌 값이 그대로 보고서에 들어갑니다 — 저장은 다음에 이 화면을 열 때를 위해 남기는 일입니다.
-      기관에 보내기 전에 이 값들은 직접 확인해 주세요(사이트가 대신 정하지 않습니다). 파일을 받는 단추는 위 <strong>내보내기</strong> 카드에 있습니다.
+      기관에 보내기 전에 이 값들은 직접 확인해 주세요(사이트가 대신 정하지 않습니다). 파일을 받는 단추는 위 <strong>내보내기</strong> 카드의 <strong>보고서 한 편</strong>에 있습니다.
     </p>
 
     <div class="fields" role="group" aria-label="보고서 정보">
