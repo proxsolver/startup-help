@@ -28,9 +28,28 @@ const backupLimit = [
   <p class="notice info no-print">
     <strong>서버에 올라가지 않는 도구입니다</strong>
     입력한 내용은 이 브라우저의 저장소에만 들어갑니다. 계정을 만들거나 영수증 파일을 전송하지 않아도 됩니다.
-    다만 브라우저 데이터를 비우면 사라지므로, 마감 뒤에는 아래 CSV·JSON 내보내기로 백업하세요.
+    다만 브라우저 데이터를 비우면 사라지므로, 마감 뒤에는 아래 내보내기 카드의 CSV·JSON 을 받아 두세요.
     여기서 고르는 항목은 정리용 분류일 뿐이며, 실제 인정 여부·서식 기준은 담당 주관기관 안내를 확인해야 합니다.
   </p>
+
+  <div class="card no-print export">
+    <h2>내보내기</h2>
+    <p class="small muted">
+      <strong>보고서 한 편</strong>은 이 화면의 행과 분류를 그대로 묶은 문서 파일입니다
+      (보고서 머리 · 1 집행 목록 · 2 비목별 합계 · 3 증빙 공백) — 기관 공식 서식을 대체하지 않습니다.
+    </p>
+    <h3 id="exp-report">보고서 한 편</h3>
+    <div class="row" role="group" aria-labelledby="exp-report">
+      <div class="shrink"><button class="btn" type="button" data-export-report-html>보고서 HTML 내보내기</button></div>
+      <div class="shrink"><button class="btn ghost" type="button" data-export-report-docx>보고서 DOCX 내보내기</button></div>
+    </div>
+    <h3 id="exp-backup">데이터 백업</h3>
+    <div class="row" role="group" aria-labelledby="exp-backup">
+      <div class="shrink"><button class="btn" type="button" data-export-csv>CSV 내보내기</button></div>
+      <div class="shrink"><button class="btn" type="button" data-export-bundle>정산 꾸러미 내보내기</button></div>
+      <div class="shrink"><button class="btn ghost" type="button" data-export-json>JSON 백업</button></div>
+    </div>
+  </div>
 
   <div class="card no-print">
     <h2>새 지출 추가</h2>
@@ -175,12 +194,12 @@ const backupLimit = [
   </div>
 
   <div class="card no-print" data-report-card>
-    <h2>보고서 한 편으로 내보내기</h2>
+    <h2>보고서 머리에 넣을 값</h2>
     <p class="small muted">
-      방금 넣은 행과 이 화면의 분류를 그대로 모아 <strong>정리 보고서</strong>로 만들어 파일로 내려줍니다
-      (보고서 머리 · 1 집행 목록 · 2 비목별 합계 · 3 증빙 공백). 숫자는 화면 요약과 같은 계산 함수에서 나옵니다 — 파일 때문에 값이 달라지지 않습니다.
-      기관에 보내기 전에 아래 값은 직접 확인해야 합니다(사이트가 대신 정하지 않습니다).
+      이 값은 보고서 머리(사업명 · 신청인·대표자 · 주관 기관 · 정산 기간 · 연락처 · 특이사항)에만 들어갑니다.
+      숫자는 화면 요약과 같은 계산 함수에서 나옵니다 — 파일 때문에 값이 달라지지 않습니다.
       <strong>「저장」을 누르지 않아도</strong> 아래 입력창에 지금 적힌 값이 그대로 보고서에 들어갑니다 — 저장은 다음에 이 화면을 열 때를 위해 남기는 일입니다.
+      기관에 보내기 전에 이 값들은 직접 확인해 주세요(사이트가 대신 정하지 않습니다). 파일을 받는 단추는 위 <strong>내보내기</strong> 카드에 있습니다.
     </p>
 
     <div class="fields" role="group" aria-label="보고서 정보">
@@ -224,16 +243,12 @@ const backupLimit = [
       <ul data-report-gap-list></ul>
     </p>
 
-    <div class="row">
-      <div class="shrink"><button class="btn" type="button" data-export-report-html>보고서 HTML 내보내기</button></div>
-      <div class="shrink"><button class="btn ghost" type="button" data-export-report-docx>보고서 DOCX 내보내기</button></div>
-    </div>
     <p class="small muted">
       두 파일 모두 이 브라우저 안에서 조립되고, 담긴 값은 화면에 보이는 표와 같습니다. 내려받는 HTML 은 스크립트가 없는
       단일 파일입니다 — 열어 확인한 뒤 브라우저에서 <strong>인쇄 → PDF로 저장</strong> 하면 A4 보고서 PDF 가 됩니다.
       DOCX 는 OOXML(WordprocessingML) 규격을 지켜 이 사이트 코드가 손으로 조립한 파일이고, 글꼴은 맑은 고딕·Malgun Gothic 으로
       지정합니다(그 글꼴이 없는 컴퓨터에서는 대체 글꼴로 보일 수 있습니다). <strong>실제 워드·한글 프로그램에서 열어 고쳐 본 것은
-      아직 아닙니다</strong> — 열리지 않거나 표가 어긋나면 HTML 로 받아 인쇄하거나, 아래 CSV·꾸러미를 쓰세요.
+      아직 아닙니다</strong> — 열리지 않거나 표가 어긋나면 HTML 로 받아 인쇄하거나, 위 <strong>데이터 백업</strong>의 CSV·꾸러미를 쓰세요.
       PDF 는 이 사이트가 직접 만들지 않습니다 — 한글 글꼴을 파일에 심지 않으면서
       올바르게 나오도록 만드는 방법을 확인하지 못했기 때문에, 인쇄 경로만 안내합니다.
     </p>
@@ -379,9 +394,6 @@ const backupLimit = [
   </div>
 
   <div class="row no-print">
-    <div class="shrink"><button class="btn" type="button" data-export-csv>CSV 내보내기</button></div>
-    <div class="shrink"><button class="btn" type="button" data-export-bundle>정산 꾸러미 내보내기</button></div>
-    <div class="shrink"><button class="btn ghost" type="button" data-export-json>JSON 백업</button></div>
     <div>
       <label for="import-file">JSON 복원</label>
       <input type="file" id="import-file" accept="application/json,.json" />
