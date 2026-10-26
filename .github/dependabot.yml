@@ -2,6 +2,10 @@
 # 동작: 매주 금요일 03:00(아시아/서울)에 npm 과 github-actions 을 각각 확인합니다.
 # `.github/workflows/deploy.yml` 의 Actions 는 부동 태그가 아니라 커밋 해시로 고정해 두었으므로,
 # 갱신 제안은 버전 이름과 해시를 함께 고치는 형태로 옵니다.
+#
+# 묶음 규칙(2026-10-27): 처음 이 파일을 넣자 주 버전 업그레이드가 PR 일곱 개(#1~#7)로 따로따로 왔습니다.
+# 주 버전은 개별로 두면 창구가 생태계 개수 × 패키지 수만큼 늘어 검수가 사실상 불가능합니다.
+# 그래서 주 버전은 생태계당 한 개의 묶음 PR 로 받고, 마이너·패치도 한 묶음으로 받습니다.
 version: 2
 updates:
   - package-ecosystem: npm
@@ -14,12 +18,17 @@ updates:
     open-pull-requests-limit: 5
     groups:
       # 실행 환경과 테스트 도구를 한 번에 올린다(별도로 올리면 게이트가 서로 다른 세대에 붙는다).
-      build-and-test:
+      npm-minor-and-patch:
         patterns:
           - '*'
         update-types:
           - minor
           - patch
+      npm-major:
+        patterns:
+          - '*'
+        update-types:
+          - major
 
   - package-ecosystem: github-actions
     directory: '/'
@@ -29,3 +38,15 @@ updates:
       time: '03:00'
       timezone: Asia/Seoul
     open-pull-requests-limit: 5
+    groups:
+      actions-minor-and-patch:
+        patterns:
+          - '*'
+        update-types:
+          - minor
+          - patch
+      actions-major:
+        patterns:
+          - '*'
+        update-types:
+          - major

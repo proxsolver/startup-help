@@ -31,6 +31,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const README = join(ROOT, 'README.md');
+const SECURITY = join(ROOT, 'SECURITY.md');
 const CONTENT = join(ROOT, 'src', 'content', 'guides');
 /**
  * 실제 라우트 목록. 예전에는 손으로 적었습니다 — 그래서 새 페이지를 만들 때마다 목록에 한 줄을 빠뜨려
@@ -139,9 +140,19 @@ const ISSUER_SOURCES = [{ host: 'shinhancard.com', name: '신한카드' }];
  * 한국어가 아닌 동아시아 문자 섞임. 히라가나·가타카나·한자(주로 쓰이는 U+4E00~9FFF)뿐 아니라
  * 확장 A(U+3400~4DBF)·호환 한자(U+F900~FAFF)·주음문자(U+3100~312F)·전각 문자(U+FF00~FFEF)도 막습니다
  * — 글을 옮기던 중 섞여 들어오는 영역들이라 빌드에서 함께 막습니다.
- * U+3000~303F(「」··등)는 한국어 본문에서 실제로 쓰이므로 일부러 넣지 않았습니다.
+ * U+3000~303F 는 한꺼번에 막지 않습니다. 이 영역의 겹낫표(U+300C/D)·겹대괄호(U+3014/15)·
+ * 날개괄호(U+3008/9) 는 한국어 본문에서 실제로 쓰는 표기라 금지하면 정상 문서가 막힙니다
+ * (저장소 전수 조사: 겹낫표 75·겹대괄호 52·날개괄호 2).
+ * 대신 같은 영역에서 한국어 글에 들어올 일 없는 것만 낱개로 금지합니다 —
+ * 전각 공백 U+3000, 일본어 쉼표 U+3001, 일본어 마침표 U+3002, 같은 글 반복 부호 U+3003·U+3005,
+ * 마무리 표시 U+3006, 일본어 물결 U+301C, 물결 대시 U+3030, 급소 표시 U+303D, 거리 마침표 U+303F.
+ * 금지하는 글자는 이 설명에도 글자 그대로 적지 않습니다. 이 파일도 검사의 대상이라, 규칙을 정의하는
+ * 파일에 금지 글자를 그대로 적으면 첫 실행에서 자기가 자기를 막습니다(2026-10-27 실제로 발생).
+ * 넓힌 계기는 README 로 일본어 마침표 U+3002 가 들어온 사고 — 예전 규칙은 이 영역을 통째로 비워
+ * 잡지 못했습니다.
  */
-const DRIFT = /[\u3040-\u30ff\u3100-\u312f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef]/g;
+const DRIFT =
+  /[\u3040-\u30ff\u3100-\u312f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef\u3000\u3001\u3002\u3003\u3005\u3006\u301c\u3030\u303d\u303f]/g;
 
 /** @type {string[]} */
 const problems = [];
@@ -433,7 +444,7 @@ if (problems.length) {
  * (한국어 사이트 작성 중 모델·편집 실수로 섞여 들어가는 사고를 CI에서 영구 차단)
  */
 const DRIFT_TARGETS = ['src', 'tests', 'scripts', 'public', '.github'];
-const DRIFT_FILES = [README];
+const DRIFT_FILES = [README, SECURITY];
 /**
  * @param {string} dir
  * @returns {Generator<string>}
