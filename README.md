@@ -232,7 +232,7 @@ npm run check:dist     # 배포물 검사: 내부 링크 612건·화면 27개 (b
 `actions/checkout` `fbc6f39…`(v5.1.0) · `actions/setup-node` `a0853c2…`(v5.0.0) · `actions/upload-pages-artifact` `7b1f4a7…`(v4.0.0) ·
 `actions/deploy-pages` `d6db901…`(v4.0.5). 고정 시점에 부동 태그가 가리키던 commit 과 같은 대상이라 오늘 배포 동작은 바뀌지 않습니다.
 `.github/dependabot.yml` 로 매주 금요일 03:00(아시아/서울) 에 `npm`·Actions 갱신 제안이 오게 했고, `SECURITY.md` 에 위험면·신고 경로·알리고 남기는 한계를 적었습니다.
-남은 것: CodeQL 도입 판단(정적 사이트라 이득이 작아 보류), 저장소 Settings 의 사람 항목 두 개 — 비공개 취약점 신고(2026-10-27 API 확인: 꺼져 있음)·push protection.
+남은 것: CodeQL 도입 판단(정적 사이트라 이득이 작아 보류), push protection — 2026-10-27 에 REST 로 켜려 했으나 이 저장소 경로가 404 로 응답하지 않아(POST·PUT 모두) 저장소 화면에서 켜야 합니다. 비공개 취약점 신고는 같은 날 켰습니다(읽기 확인 `enabled: true`).
 
 ## 배포
 
@@ -608,7 +608,7 @@ frontmatter 만 보면 글 속의 블로그·기사 링크가 무방비로 통�
 - 개인정보 처리방침의 법적 의무 범위 확인 (현재는 운영 사실 서술만)
 - OCR·사진 인식 (서버 수신 없이 구현 가능한지 먼저 검토)
 - 접근성·E2E 자동 테스트 (현재: 단위 테스트 259 + 콘텐츠 게이트 + 빌드 검사)
-- 배포 파이프라인 잠금은 2026-10-27 에 끝냈습니다(Actions 네 개 해시 고정 · dependabot · `SECURITY.md`) — 위 '보안 관점' 참조. 남아 있는 것은 CodeQL 도입 판단과, 저장소 Settings 에서 사람이 켜는 두 개(비공개 취약점 신고·push protection) 입니다.
+- 배포 파이프라인 잠금은 2026-10-27 에 끝냈습니다(Actions 네 개 해시 고정 · dependabot · `SECURITY.md` · 비공개 취약점 신고 켜기) — 위 '보안 관점' 참조. 남아 있는 것은 CodeQL 도입 판단과 push protection 한 개로, 후자는 REST 경로가 404 라 저장소 화면에서 켜야 합니다.
 - 콘텐츠 증량 (현재 10건)
 
 ## 라이선스·면책
