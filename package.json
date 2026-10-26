@@ -15,7 +15,7 @@
     "deploy:preview": "ASTRO_LOCAL=1 astro build"
   },
   "dependencies": {
-    "astro": "^5.0.0"
+    "astro": "^7.4.2"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.12",
