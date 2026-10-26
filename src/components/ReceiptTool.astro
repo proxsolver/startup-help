@@ -397,12 +397,19 @@ const backupLimit = [
     </div>
   </div>
 
-  <div class="row no-print">
-    <div>
-      <label for="import-file">JSON 복원</label>
-      <input type="file" id="import-file" accept="application/json,.json" />
+  <div class="no-print local-store">
+    <h3 id="grp-local" class="row-head">이 브라우저 안의 저장소 · 되돌리고 비우기</h3>
+    <p class="small muted">
+      받아 두는 파일(CSV · 정산 꾸러미 · JSON 백업)과 제출용 <strong>보고서 한 편</strong>은 위 <strong>내보내기</strong> 카드에 있습니다.
+      여기는 백업 파일을 이 브라우저에 되돌리거나 지출 목록을 비우는 자리입니다.
+    </p>
+    <div class="row" role="group" aria-labelledby="grp-local">
+      <div>
+        <label for="import-file">JSON 복원</label>
+        <input type="file" id="import-file" accept="application/json,.json" />
+      </div>
+      <div class="shrink"><button class="btn danger" type="button" data-clear>지출 목록 비우기</button></div>
     </div>
-    <div class="shrink"><button class="btn danger" type="button" data-clear>지출 목록 비우기</button></div>
   </div>
   <div class="sub-stack no-print">
     <p class="small muted">
