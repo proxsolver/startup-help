@@ -15,12 +15,12 @@
     "deploy:preview": "ASTRO_LOCAL=1 astro build"
   },
   "dependencies": {
-    "astro": "^5.0.0"
+    "astro": "^7.4.2"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.12",
     "@types/node": "^26.6.5",
-    "typescript": "^5.9.3",
-    "vitest": "^3.0.0"
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
   }
 }
